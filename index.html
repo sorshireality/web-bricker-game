@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprite Debug View</title>
+    <style>
+        body {
+            background: #111;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            background: #222;
+            border: 1px solid #555;
+            image-rendering: pixelated; /* Keeps pixel art sharp */
+        }
+    </style>
+</head>
+<body>
+<!-- Updated width and height attributes -->
+<canvas id="gameCanvas" width="550" height="700"></canvas>
+<script src="js/main.js" type="module"></script>
+</body>
+</html>
