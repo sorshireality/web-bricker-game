@@ -32,33 +32,6 @@ export class CollisionDetector {
 
     /**
      * Checks for and handles collision between the ball and bricks.
-     * Modifies the ball's velocity and potentially removes bricks.
-     * @param {Ball} ball - The ball object.
-     * @param {Array<AbstractBrick>} bricks - The array of brick objects.
-     * @returns {Array<AbstractBrick>} The potentially modified array of bricks (e.g., after removing hit bricks).
-     */
-    static checkBricks(ball, bricks) {
-        if (!ball || !bricks || bricks.length === 0) return bricks; // Nothing to check
-
-        let remainingBricks = bricks; // Start with the current bricks
-
-        // TODO: Implement brick collision logic here
-        // - Loop through each brick in 'remainingBricks'
-        // - Perform AABB check between ball and brick
-        // - If collision:
-        //    - Determine collision side (top/bottom/left/right) to reverse correct velocity (dx or dy)
-        //    - Call brick.hit()
-        //    - Potentially add score
-        //    - Break the loop if you only want one brick hit per frame (common)
-        // - After the loop, filter out destroyed bricks:
-        //   remainingBricks = remainingBricks.filter(brick => !brick.isDestroyed());
-
-        console.warn("CollisionDetector.checkBricks() not implemented yet."); // Placeholder
-
-        return remainingBricks; // Return the list (potentially filtered)
-    }
-    /**
-     * Checks for and handles collision between the ball and bricks.
      * Modifies the ball's velocity and calls hit() on the brick.
      * Filters out destroyed bricks.
      * @param {Ball} ball - The ball object.
@@ -66,7 +39,12 @@ export class CollisionDetector {
      * @returns {Array<AbstractBrick>} The filtered array of bricks (only non-destroyed ones).
      */
     static checkBricks(ball, bricks) {
-        if (!ball || !bricks || bricks.length === 0) return bricks;
+        if (!ball || !bricks || bricks.length === 0) return {
+            bricks,
+            bricksHit: 0
+        };
+
+        let bricksHit = 0;
 
         for (let i = 0; i < bricks.length; i++) {
             const brick = bricks[i];
@@ -92,6 +70,10 @@ export class CollisionDetector {
                 // --- Collision Detected ---
                 console.log("Brick Hit!"); // Debug log
                 brick.hit(); // Reduce brick health
+
+                if (brick.isDestroyed()) {
+                    bricksHit++; // Count this as a break only if destroyed
+                }
 
                 // --- Determine Bounce Direction (Simple Approach) ---
                 // A common simple way is to reverse vertical velocity.
@@ -128,9 +110,55 @@ export class CollisionDetector {
             }
         }
 
-        // --- Filter out destroyed bricks ---
-        // Return a new array containing only the bricks that are NOT destroyed
-        return bricks.filter(brick => !brick.isDestroyed());
+        const remainingBricks = bricks.filter(brick => !brick.isDestroyed());
+
+        return {
+            bricks: remainingBricks,
+            bricksHit
+        };
+    }
+    /**
+     * Checks for and handles collision between the ball and the canvas boundaries.
+     * @param {Ball} ball - The ball object.
+     * @param {HTMLCanvasElement} canvas - The canvas object.
+     * @returns {boolean} true if ball hit the ground (bottom), false otherwise.
+     */
+    static checkWalls(ball, canvas) {
+        if (!ball || !canvas) return false;
+
+        let hitGround = false;
+
+        // Left wall
+        if (ball.x - ball.radius < 0) {
+            ball.x = ball.radius; // Keep ball within bounds
+            ball.dx = -ball.dx; // Reverse horizontal direction
+        }
+
+        // Right wall
+        if (ball.x + ball.radius > canvas.width) {
+            ball.x = canvas.width - ball.radius; // Keep ball within bounds
+            ball.dx = -ball.dx; // Reverse horizontal direction
+        }
+
+        // Top wall
+        if (ball.y - ball.radius < 0) {
+            ball.y = ball.radius; // Keep ball within bounds
+            ball.dy = -ball.dy; // Reverse vertical direction
+        }
+
+        // Bottom wall - GROUND
+        if (ball.y + ball.radius > canvas.height) {
+            // We'll let the game handle repositioning for game over
+            hitGround = true;
+
+            // Optionally, keep the ball visible on screen
+            ball.y = canvas.height - ball.radius;
+
+            // Note: We don't reverse direction here because the game
+            // should handle what happens when the ball hits the ground
+        }
+
+        return hitGround;
     }
 
     // Add other collision checks here later (e.g., ball vs walls if needed differently than boundary checks)
