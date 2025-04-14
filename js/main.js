@@ -1,10 +1,5 @@
 // ==== GAME SETUP ====
-import { SpriteManager } from './core/SpriteManager.js';
-import { Ball } from './entities/Ball.js';
-import { Paddle } from './entities/Paddle.js';
-import {CollisionDetector} from "./core/CollisionDetector.js";
-import {StarBrick} from "./entities/StarBrick.js";
-import { Score } from './entities/Score.js';
+import { Game } from './Game.js';
 import { Log } from './entities/Log.js';
 
 const canvas = document.getElementById('gameCanvas');
@@ -14,94 +9,102 @@ if (!canvas) {
     throw new Error("Fatal Error: Canvas element not found!");
 }
 
-const spriteManager = new SpriteManager();
-
 // Game state management
 const GameState = {
-    INITIALIZING: 'initializing',
+    MENU: 'menu',
     RUNNING: 'running',
     PAUSED: 'paused',
     GAME_OVER: 'game_over',
     LEVEL_COMPLETE: 'level_complete'
 };
 
-let gameState = GameState.INITIALIZING;
-let paddle;
-let ball;
-let bricks = [];
-let score;
+let gameState = GameState.MENU;
+let game;
 let log;
-let lastBrickHitTime = 0;
-const comboTimeWindow = 500;
-
-const brickRowCount = 3;
-const brickColumnCount = 8;
-const brickWidth = 48;
-const brickHeight = 20;
-const brickPadding = 5;
-const brickOffsetTop = 30;
-const gridWidth = brickColumnCount * (brickWidth + brickPadding) - brickPadding;
-const brickOffsetLeft = (canvas.width - gridWidth) / 2;
 
 // Performance optimization
 let lastFrameTime = 0;
 const targetFPS = 60;
 const frameInterval = 1000 / targetFPS;
 
+// Create start button
+const startButton = document.createElement('button');
+startButton.textContent = 'Start Game';
+startButton.style.position = 'fixed';
+startButton.style.top = '50%';
+startButton.style.left = '42%';
+startButton.style.transform = 'translate(-50%, -50%)';
+startButton.style.padding = '15px 30px';
+startButton.style.fontSize = '20px';
+startButton.style.cursor = 'pointer';
+startButton.style.backgroundColor = '#4CAF50';
+startButton.style.color = 'white';
+startButton.style.border = 'none';
+startButton.style.borderRadius = '5px';
+startButton.style.zIndex = '1000';
+startButton.style.display = 'block';
+document.body.appendChild(startButton);
+
+startButton.addEventListener('click', () => {
+    startButton.style.display = 'none';
+    initializeGame();
+});
+
 function initializeGame() {
-    score = new Score();
     log = new Log();
     log.addMessage("Game started! Break those bricks!", "#00ff00");
-
-    const paddleWidth = 100;
-    const paddleHeight = 20;
-    const paddleX = (canvas.width - paddleWidth) / 2;
-    const paddleY = canvas.height - paddleHeight - 20;
-    paddle = new Paddle(paddleX, paddleY, paddleWidth, paddleHeight, spriteManager);
-
-    const ballRadius = 10;
-    const ballX = canvas.width / 2;
-    const ballY = paddleY - ballRadius - 10;
-    ball = new Ball(ballX, ballY, ballRadius, spriteManager);
-
-    createBricks();
+    game = new Game(canvas);
     setupEventListeners();
-    
     gameState = GameState.RUNNING;
     requestAnimationFrame(gameLoop);
 }
 
-function createBricks() {
-    bricks = [];
-    for (let c = 0; c < brickColumnCount; c++) {
-        for (let r = 0; r < brickRowCount; r++) {
-            const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
-            const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
-            bricks.push(new StarBrick(brickX, brickY, brickWidth, brickHeight, 1, spriteManager));
-        }
-    }
-}
-
 function setupEventListeners() {
+    // Mouse controls
     document.removeEventListener('mousemove', mouseMoveHandler);
     document.addEventListener('mousemove', mouseMoveHandler);
     
-    // Add keyboard controls for pause/resume
+    // Keyboard controls
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+    
+    // Pause game
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             togglePause();
         }
     });
+
+    // Click handling for restart button
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        game.handleClick(x, y);
+    });
 }
 
-function togglePause() {
-    if (gameState === GameState.RUNNING) {
-        gameState = GameState.PAUSED;
-        log.addMessage("Game Paused", "#ffff00");
-    } else if (gameState === GameState.PAUSED) {
-        gameState = GameState.RUNNING;
-        log.addMessage("Game Resumed", "#00ff00");
-        requestAnimationFrame(gameLoop);
+function handleKeyDown(e) {
+    if (gameState !== GameState.RUNNING) return;
+    
+    switch(e.key) {
+        case 'ArrowLeft':
+            game.paddle.setMovingLeft(true);
+            break;
+        case 'ArrowRight':
+            game.paddle.setMovingRight(true);
+            break;
+    }
+}
+
+function handleKeyUp(e) {
+    switch(e.key) {
+        case 'ArrowLeft':
+            game.paddle.setMovingLeft(false);
+            break;
+        case 'ArrowRight':
+            game.paddle.setMovingRight(false);
+            break;
     }
 }
 
@@ -112,8 +115,19 @@ function mouseMoveHandler(e) {
     const scaleX = canvas.width / rect.width;
     let mouseX = (e.clientX - rect.left) * scaleX;
 
-    if (paddle) {
-        paddle.x = Math.max(0, Math.min(mouseX - paddle.width / 2, canvas.width - paddle.width));
+    if (game.paddle) {
+        game.paddle.x = Math.max(0, Math.min(mouseX - game.paddle.width / 2, canvas.width - game.paddle.width));
+    }
+}
+
+function togglePause() {
+    if (gameState === GameState.RUNNING) {
+        gameState = GameState.PAUSED;
+        log.addMessage("Game Paused", "#ffff00");
+    } else if (gameState === GameState.PAUSED) {
+        gameState = GameState.RUNNING;
+        log.addMessage("Game Resumed", "#00ff00");
+        requestAnimationFrame(gameLoop);
     }
 }
 
@@ -129,62 +143,13 @@ function gameLoop(timestamp) {
     }
     lastFrameTime = timestamp;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Update and draw game
+    game.update();
+    game.draw();
 
-    // Update game objects
-    paddle.update(canvas);
-    ball.update(canvas);
-
-    // Check collisions
-    CollisionDetector.checkPaddle(ball, paddle);
-    const result = CollisionDetector.checkBricks(ball, bricks);
-
-    if (result.bricksHit > 0) {
-        const now = Date.now();
-        const isCombo = (now - lastBrickHitTime) < comboTimeWindow;
-        lastBrickHitTime = now;
-
-        const scoreInfo = score.addPoints(result.bricksHit, isCombo);
-        log.logScore(scoreInfo);
-    }
-
-    bricks = result.bricks;
-
-    // Check game state
-    if (bricks.length === 0) {
-        gameState = GameState.LEVEL_COMPLETE;
-        log.addMessage("LEVEL COMPLETE!", "#0F0");
-        // Add level progression logic here
-    }
-
-    if (CollisionDetector.checkWalls(ball, canvas)) {
-        gameState = GameState.GAME_OVER;
-        log.addMessage("Game Over!", "#ff0000");
-        return;
-    }
-
-    // Draw game objects
-    paddle.draw(ctx);
-    bricks.forEach(brick => brick.draw(ctx));
-    ball.draw(ctx);
+    // Update score display
+    document.getElementById('scoreValue').textContent = game.score;
+    document.getElementById('levelValue').textContent = game.level;
 
     requestAnimationFrame(gameLoop);
-}
-
-// ==== LOAD ASSETS AND START ====
-const SPRITESHEET_PATH = './assets/spritesheet.png';
-const hasSpriteSheet = false;
-
-if (hasSpriteSheet) {
-    console.log("Loading spritesheet...");
-    spriteManager.load(SPRITESHEET_PATH, (error) => {
-        if (error) {
-            console.error("Spritesheet failed to load. Proceeding without sprites.");
-        } else {
-            console.log("Spritesheet loaded.");
-        }
-        initializeGame();
-    });
-} else {
-    initializeGame();
 }
