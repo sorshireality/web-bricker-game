@@ -5,7 +5,8 @@ const SPRITES = {
     ball: { x: 17, y: 63, w: 23, h: 23 },
     
     // Brick sprites - assuming different colored bricks are in the spritesheet
-    brick_blue: { x: 17, y: 8, w: 32, h: 16 },
+    
+    brick_blue: { x: 19, y: 161, w: 42, h: 21 },
     brick_green: { x: 50, y: 8, w: 32, h: 16 },
     brick_red: { x: 83, y: 8, w: 32, h: 16 },
     

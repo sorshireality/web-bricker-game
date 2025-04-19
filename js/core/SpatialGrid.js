@@ -5,6 +5,10 @@ export class SpatialGrid {
         this.height = height;
         this.grid = new Map();
         this.debugMode = false;
+        
+        // Calculate number of cells
+        this.cellsX = Math.ceil(width / cellSize);
+        this.cellsY = Math.ceil(height / cellSize);
     }
 
     // Convert position to grid coordinates
@@ -21,10 +25,10 @@ export class SpatialGrid {
         const height = entity.height || (entity.radius * 2);
         
         // Get the cells this entity overlaps with
-        const startX = Math.floor((entity.x - width/2) / this.cellSize);
-        const startY = Math.floor((entity.y - height/2) / this.cellSize);
-        const endX = Math.floor((entity.x + width/2) / this.cellSize);
-        const endY = Math.floor((entity.y + height/2) / this.cellSize);
+        const startX = Math.max(0, Math.floor((entity.x - width/2) / this.cellSize));
+        const startY = Math.max(0, Math.floor((entity.y - height/2) / this.cellSize));
+        const endX = Math.min(this.cellsX - 1, Math.floor((entity.x + width/2) / this.cellSize));
+        const endY = Math.min(this.cellsY - 1, Math.floor((entity.y + height/2) / this.cellSize));
 
         // Add entity to all overlapping cells
         for (let cellX = startX; cellX <= endX; cellX++) {
@@ -44,10 +48,10 @@ export class SpatialGrid {
         const width = entity.width || (entity.radius * 2);
         const height = entity.height || (entity.radius * 2);
         
-        const startX = Math.floor((entity.x - width/2) / this.cellSize);
-        const startY = Math.floor((entity.y - height/2) / this.cellSize);
-        const endX = Math.floor((entity.x + width/2) / this.cellSize);
-        const endY = Math.floor((entity.y + height/2) / this.cellSize);
+        const startX = Math.max(0, Math.floor((entity.x - width/2) / this.cellSize));
+        const startY = Math.max(0, Math.floor((entity.y - height/2) / this.cellSize));
+        const endX = Math.min(this.cellsX - 1, Math.floor((entity.x + width/2) / this.cellSize));
+        const endY = Math.min(this.cellsY - 1, Math.floor((entity.y + height/2) / this.cellSize));
 
         for (let cellX = startX; cellX <= endX; cellX++) {
             for (let cellY = startY; cellY <= endY; cellY++) {
@@ -67,10 +71,10 @@ export class SpatialGrid {
         
         const candidates = new Set();
         
-        const startX = Math.floor((entity.x - width/2) / this.cellSize);
-        const startY = Math.floor((entity.y - height/2) / this.cellSize);
-        const endX = Math.floor((entity.x + width/2) / this.cellSize);
-        const endY = Math.floor((entity.y + height/2) / this.cellSize);
+        const startX = Math.max(0, Math.floor((entity.x - width/2) / this.cellSize));
+        const startY = Math.max(0, Math.floor((entity.y - height/2) / this.cellSize));
+        const endX = Math.min(this.cellsX - 1, Math.floor((entity.x + width/2) / this.cellSize));
+        const endY = Math.min(this.cellsY - 1, Math.floor((entity.y + height/2) / this.cellSize));
 
         for (let cellX = startX; cellX <= endX; cellX++) {
             for (let cellY = startY; cellY <= endY; cellY++) {
@@ -114,8 +118,8 @@ export class SpatialGrid {
         if (!this.debugMode) return;
 
         // Draw grid lines
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
 
         // Vertical lines
         for (let x = 0; x <= this.width; x += this.cellSize) {
@@ -134,10 +138,13 @@ export class SpatialGrid {
         }
 
         // Draw occupied cells
-        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
         for (const [key, entities] of this.grid.entries()) {
             if (entities.size > 0) {
                 const [cellX, cellY] = key.split(',').map(Number);
+                
+                // Draw cell background with opacity based on object count
+                const opacity = Math.min(0.3, 0.1 + (entities.size * 0.05));
+                ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
                 ctx.fillRect(
                     cellX * this.cellSize,
                     cellY * this.cellSize,
@@ -147,20 +154,19 @@ export class SpatialGrid {
 
                 // Draw entity count
                 ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px Arial';
+                ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText(
                     entities.size.toString(),
                     cellX * this.cellSize + this.cellSize / 2,
                     cellY * this.cellSize + this.cellSize / 2
                 );
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
             }
         }
 
         // Draw entity bounds
-        ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
+        ctx.lineWidth = 1;
         for (const entities of this.grid.values()) {
             for (const entity of entities) {
                 // Enable each entity's debug visualization if it has one

@@ -85,17 +85,38 @@ export class Ball extends AbstractEntity {
         // Check collisions with bricks
         for (const candidate of candidates) {
             if (candidate instanceof Brick) {
-                const distanceX = Math.abs(this.x - (candidate.x + candidate.width / 2));
-                const distanceY = Math.abs(this.y - (candidate.y + candidate.height / 2));
-                const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+                if (this.checkCollision(candidate)) {
+                    // Determine which side of the brick was hit
+                    const ballLeft = this.x - this.radius;
+                    const ballRight = this.x + this.radius;
+                    const ballTop = this.y - this.radius;
+                    const ballBottom = this.y + this.radius;
 
-                if (distance < this.radius) {
-                    const overlapX = this.radius - Math.abs(distanceX);
-                    const overlapY = this.radius - Math.abs(distanceY);
+                    const brickLeft = candidate.x;
+                    const brickRight = candidate.x + candidate.width;
+                    const brickTop = candidate.y;
+                    const brickBottom = candidate.y + candidate.height;
 
+                    // Calculate overlap on each axis
+                    const overlapX = Math.min(ballRight - brickLeft, brickRight - ballLeft);
+                    const overlapY = Math.min(ballBottom - brickTop, brickBottom - ballTop);
+
+                    // Resolve collision based on minimum overlap
                     if (overlapX < overlapY) {
+                        // Horizontal collision
+                        if (this.x < candidate.x + candidate.width / 2) {
+                            this.x = candidate.x - this.radius;
+                        } else {
+                            this.x = candidate.x + candidate.width + this.radius;
+                        }
                         this.dx = -this.dx;
                     } else {
+                        // Vertical collision
+                        if (this.y < candidate.y + candidate.height / 2) {
+                            this.y = candidate.y - this.radius;
+                        } else {
+                            this.y = candidate.y + candidate.height + this.radius;
+                        }
                         this.dy = -this.dy;
                     }
 
@@ -128,23 +149,32 @@ export class Ball extends AbstractEntity {
     }
 
     checkCollision(entity) {
-        const collision = this.x + this.radius > entity.x &&
-               this.x - this.radius < entity.x + (entity.width || entity.radius * 2) &&
-               this.y + this.radius > entity.y &&
-               this.y - this.radius < entity.y + (entity.height || entity.radius * 2);
-        
-        console.log('Collision check:', {
-            ball: { x: this.x, y: this.y, radius: this.radius },
-            entity: { 
-                x: entity.x, 
-                y: entity.y, 
-                width: entity.width || entity.radius * 2, 
-                height: entity.height || entity.radius * 2 
-            },
-            result: collision
-        });
-        
-        return collision;
+        // For circular entities (like ball), use radius
+        if (entity.radius) {
+            const distance = Math.sqrt(
+                Math.pow(this.x - entity.x, 2) + 
+                Math.pow(this.y - entity.y, 2)
+            );
+            return distance <= (this.radius + entity.radius);
+        }
+
+        // For rectangular entities (like paddle and bricks)
+        // Check if ball's edge touches or overlaps with the rectangle
+        const ballLeft = this.x - this.radius;
+        const ballRight = this.x + this.radius;
+        const ballTop = this.y - this.radius;
+        const ballBottom = this.y + this.radius;
+
+        const rectLeft = entity.x;
+        const rectRight = entity.x + entity.width;
+        const rectTop = entity.y;
+        const rectBottom = entity.y + entity.height;
+
+        // Check if ball's edge touches or overlaps with the rectangle
+        return ballRight >= rectLeft && 
+               ballLeft <= rectRight && 
+               ballBottom >= rectTop && 
+               ballTop <= rectBottom;
     }
 
     setFireMode(enabled) {

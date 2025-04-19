@@ -166,15 +166,18 @@ export class Game {
         const padding = GameConfig.brickConfig.padding;
         const offsetTop = GameConfig.brickConfig.offsetTop;
         
-        // Calculate total width of brick grid
-        const totalWidth = levelConfig.brickColumns * (brickWidth + padding) - padding;
+        // Calculate total width of brick grid including padding
+        const totalWidth = (levelConfig.brickColumns * brickWidth) + 
+                          ((levelConfig.brickColumns - 1) * padding);
+        
+        // Calculate starting x position to center the grid
         const startX = (this.canvas.width - totalWidth) / 2;
         
-        // Create bricks
+        // Create bricks with proper spacing
         for (let row = 0; row < levelConfig.brickRows; row++) {
             for (let col = 0; col < levelConfig.brickColumns; col++) {
-                const x = startX + col * (brickWidth + padding);
-                const y = offsetTop + row * (brickHeight + padding);
+                const x = startX + (col * (brickWidth + padding));
+                const y = offsetTop + (row * (brickHeight + padding));
                 const type = Math.random() < levelConfig.brickDistribution.glass ? 'glass' : 'wooden';
                 this.bricks.push(new Brick(x, y, type, this.spriteManager));
             }
