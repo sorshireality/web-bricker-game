@@ -2,6 +2,7 @@
 import { Game } from './Game.js';
 import { Log } from './entities/Log.js';
 import { GameEvents } from './core/EventSystem.js';
+import { GameOverState } from './states/GameOverState.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -38,10 +39,10 @@ requestAnimationFrame(gameLoop);
 function setupEventListeners() {
     if (isMobile) {
         // Touch controls for mobile
-        canvas.removeEventListener('touchstart', touchHandler);
-        canvas.removeEventListener('touchmove', touchHandler);
-        canvas.addEventListener('touchstart', touchHandler, { passive: false });
-        canvas.addEventListener('touchmove', touchHandler, { passive: false });
+        canvas.removeEventListener('touchstart', handleTouchStart);
+        canvas.removeEventListener('touchmove', handleTouchMove);
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
         
         // Prevent scrolling on mobile when touching the canvas
         canvas.addEventListener('touchstart', function(e) {
@@ -106,15 +107,7 @@ function handleKeyDown(e) {
             game.paddle.setMovingRight(true);
             break;
         case ' ':
-            // Launch ball on spacebar if not launched
-            if (!game.balls[0].launched) {
-                game.balls[0].launch();
-                // Clear the start message
-                const startMessage = document.querySelector('.log-message');
-                if (startMessage && startMessage.textContent.includes('press SPACE')) {
-                    startMessage.remove();
-                }
-            }
+            game.handleInput(' ');
             break;
     }
 }
@@ -130,7 +123,7 @@ function handleKeyUp(e) {
     }
 }
 
-function touchHandler(e) {
+function handleTouchStart(e) {
     e.preventDefault();
     if (gameState !== GameState.RUNNING) return;
     
@@ -143,15 +136,28 @@ function touchHandler(e) {
     const maxPaddleX = canvas.width - game.paddle.width;
     game.paddle.x = Math.max(0, Math.min(paddleX, maxPaddleX));
     
-    // Launch ball on touch if not launched
-    if (!game.balls[0].launched) {
-        game.balls[0].launch();
-        // Clear the start message
-        const startMessage = document.querySelector('.log-message');
-        if (startMessage && startMessage.textContent.includes('press SPACE')) {
-            startMessage.remove();
-        }
+    // Handle game state based on current state
+    if (game.stateManager.currentState instanceof GameOverState) {
+        // Restart game on touch in game over state
+        game.handleInput(' ');
+    } else if (game.stateManager.currentState.waitingForLaunch) {
+        // Launch ball if waiting for launch
+        game.handleInput(' ');
     }
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (gameState !== GameState.RUNNING) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const touchX = touch.clientX - rect.left;
+    const paddleX = touchX - game.paddle.width / 2;
+    
+    // Keep paddle within canvas bounds
+    const maxPaddleX = canvas.width - game.paddle.width;
+    game.paddle.x = Math.max(0, Math.min(paddleX, maxPaddleX));
 }
 
 function togglePause() {

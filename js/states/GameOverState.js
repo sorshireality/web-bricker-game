@@ -41,6 +41,7 @@ export class GameOverState extends GameState {
         if (key === ' ') {
             this.game.reset();
             this.game.stateManager.changeState('playing');
+            this.game.stateManager.currentState.waitingForLaunch = true;
         }
     }
 } 
