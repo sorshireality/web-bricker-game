@@ -63,18 +63,12 @@ export const GameConfig = {
         height: 20,
         speed: 2,
         dropChance: {
-            wood: 0.3,  // 30% chance to drop splitter from wood bricks
-            glass: 0.2  // 20% chance to drop fire booster from glass bricks
+            glass: 1.0  // 100% chance to drop splitter from glass bricks
         },
         effects: {
             splitter: {
                 duration: 0,  // Permanent effect
                 icon: '🎯'
-            },
-            fire: {
-                duration: 5000,  // 5 seconds
-                damageMultiplier: 2,
-                icon: '🔥'
             }
         }
     },

@@ -72,9 +72,27 @@ export class Game {
         this.events.off(GameEvents.BOOSTER_ACTIVATED);
 
         // Score updates with combo system
-        this.events.on(GameEvents.BRICK_DESTROYED, () => {
+        this.events.on(GameEvents.BRICK_DESTROYED, (brick) => {
+            console.log('BRICK_DESTROYED event received with brick:', brick);
             this.bricksDestroyedThisShot++;
             this.lastBrickDestroyed = true;
+
+            // Create booster if brick should drop one
+            if (brick.type === 'glass') {
+                console.log('Glass brick destroyed, checking for booster drop');
+                const shouldDrop = Math.random() < GameConfig.boosterConfig.dropChance.glass;
+                if (shouldDrop) {
+                    console.log('Creating booster from brick');
+                    const booster = new Booster(
+                        brick.x + brick.width/2,
+                        brick.y + brick.height/2,
+                        'splitter',
+                        this.spriteManager
+                    );
+                    this.boosters.push(booster);
+                    console.log('Booster created:', booster);
+                }
+            }
 
             // Calculate score with combo multiplier
             const baseScore = 100;
@@ -150,6 +168,7 @@ export class Game {
 
         // Booster handling
         this.events.on(GameEvents.BOOSTER_ACTIVATED, ({ type }) => {
+            console.log('Booster activated:', type);
             this.activateBooster(type);
         });
     }
@@ -166,6 +185,9 @@ export class Game {
         const padding = GameConfig.brickConfig.padding;
         const offsetTop = GameConfig.brickConfig.offsetTop;
         
+        console.log('Setting up level:', this.level);
+        console.log('Level config:', levelConfig);
+        
         // Calculate total width of brick grid including padding
         const totalWidth = (levelConfig.brickColumns * brickWidth) + 
                           ((levelConfig.brickColumns - 1) * padding);
@@ -178,8 +200,11 @@ export class Game {
             for (let col = 0; col < levelConfig.brickColumns; col++) {
                 const x = startX + (col * (brickWidth + padding));
                 const y = offsetTop + (row * (brickHeight + padding));
-                const type = Math.random() < levelConfig.brickDistribution.glass ? 'glass' : 'wooden';
-                this.bricks.push(new Brick(x, y, type, this.spriteManager));
+                const isGlass = Math.random() < levelConfig.brickDistribution.glass;
+                const type = isGlass ? 'glass' : 'wooden';
+                console.log('Creating brick:', { row, col, type, isGlass });
+                const brick = new Brick(x, y, type, this.spriteManager);
+                this.bricks.push(brick);
             }
         }
         
@@ -199,7 +224,18 @@ export class Game {
             return;
         }
         
+        // Filter out balls that are below the paddle
+        this.balls = this.balls.filter(ball => {
+            if (ball.y + ball.radius >= this.canvas.height) {
+                console.log('Ball lost, remaining balls:', this.balls.length - 1);
+                return false;
+            }
+            return true;
+        });
+        
+        // Game over only if all balls are lost
         if (this.balls.length === 0) {
+            console.log('All balls lost, game over');
             this.gameOver = true;
             this.stateManager.changeState('gameOver');
             return;
@@ -221,9 +257,23 @@ export class Game {
         // Add paddle to spatial grid
         this.spatialGrid.add(this.paddle);
         
-        // Add boosters to spatial grid
-        this.boosters.forEach(booster => {
+        // Update and add boosters to spatial grid
+        this.boosters = this.boosters.filter(booster => {
+            booster.update();
+            if (booster.isOffScreen(this.canvas)) {
+                console.log('Booster off screen');
+                return false;
+            }
+            
+            // Check for booster-paddle collision
+            if (booster.collidesWith(this.paddle)) {
+                console.log('Booster collided with paddle');
+                this.events.emit(GameEvents.BOOSTER_ACTIVATED, { type: booster.type });
+                return false;
+            }
+            
             this.spatialGrid.add(booster);
+            return true;
         });
         
         // Let the current state handle the game logic (including level completion)
@@ -236,11 +286,11 @@ export class Game {
             return;
         }
         
-        if (this.balls.length === 0) {
-            this.gameOver = true;
-            this.stateManager.draw();
-            return;
-        }
+        // Draw all game objects
+        this.bricks.forEach(brick => brick.draw(this.ctx));
+        this.balls.forEach(ball => ball.draw(this.ctx));
+        this.paddle.draw(this.ctx);
+        this.boosters.forEach(booster => booster.draw(this.ctx));
         
         this.stateManager.draw();
     }
@@ -257,16 +307,32 @@ export class Game {
         this.activeBoosters[type] = true;
         
         if (type === 'splitter') {
-            // Split all balls
+            // Split all existing balls
             const newBalls = [];
             this.balls.forEach(ball => {
+                // Create two new balls at the same position as the original
                 const ball1 = new Ball(ball.x, ball.y, ball.radius, this.spriteManager);
                 const ball2 = new Ball(ball.x, ball.y, ball.radius, this.spriteManager);
-                ball1.dx = -ball.dx;
-                ball2.dx = ball.dx;
+                
+                // Set velocities for new balls
+                const angle = Math.atan2(ball.dy, ball.dx);
+                const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+                
+                // First ball goes slightly left
+                ball1.dx = speed * Math.cos(angle - Math.PI/6);
+                ball1.dy = speed * Math.sin(angle - Math.PI/6);
+                ball1.launched = true;
+                
+                // Second ball goes slightly right
+                ball2.dx = speed * Math.cos(angle + Math.PI/6);
+                ball2.dy = speed * Math.sin(angle + Math.PI/6);
+                ball2.launched = true;
+                
                 newBalls.push(ball1, ball2);
             });
-            this.balls = newBalls;
+            
+            // Add new balls to existing ones
+            this.balls.push(...newBalls);
         } else if (type === 'fire') {
             // Activate fire mode for all balls
             this.balls.forEach(ball => {

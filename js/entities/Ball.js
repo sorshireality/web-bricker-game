@@ -123,28 +123,14 @@ export class Ball extends AbstractEntity {
                     if (candidate.hit()) {
                         const index = game.bricks.indexOf(candidate);
                         if (index !== -1) {
+                            console.log('Emitting BRICK_DESTROYED event with brick:', candidate);
+                            game.events.emit(GameEvents.BRICK_DESTROYED, candidate);
                             game.bricks.splice(index, 1);
-                            game.events.emit(GameEvents.BRICK_DESTROYED, { type: candidate.type });
-
-                            if (Math.random() < GameConfig.boosterConfig.dropChance) {
-                                const booster = new Booster(
-                                    candidate.x + candidate.width / 2,
-                                    candidate.y + candidate.height / 2,
-                                    Math.random() < 0.5 ? 'splitter' : 'fire',
-                                    game.spriteManager
-                                );
-                                game.boosters.push(booster);
-                            }
                         }
                     }
                     return; // Skip other collisions for this frame
                 }
             }
-        }
-
-        // Bottom collision (game over)
-        if (this.y + this.radius >= game.canvas.height) {
-            game.events.emit(GameEvents.GAME_OVER);
         }
     }
 
