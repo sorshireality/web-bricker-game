@@ -1,8 +1,17 @@
 // ==== SPRITE REGISTRY ====
 // Define sprites here or load from a config file later
 const SPRITES = {
-    // paddle: { x: 0, y: 0, w: 80, h: 15 }, // Example
-    // ball: { x: 0, y: 20, w: 10, h: 10 }    // Example
+    paddle: { x: 17, y: 29, w: 70, h: 9 },
+    ball: { x: 17, y: 63, w: 23, h: 23 },
+    
+    // Brick sprites - assuming different colored bricks are in the spritesheet
+    brick_blue: { x: 17, y: 8, w: 32, h: 16 },
+    brick_green: { x: 50, y: 8, w: 32, h: 16 },
+    brick_red: { x: 83, y: 8, w: 32, h: 16 },
+    
+    // Powerup sprites
+    power_fire: { x: 17, y: 45, w: 16, h: 16 },
+    power_splitter: { x: 34, y: 45, w: 16, h: 16 }
 };
 
 // ==== SPRITE MANAGER ====
@@ -11,6 +20,15 @@ export class SpriteManager {
         this.image = new Image();
         this.ready = false;
         this.spriteData = SPRITES;
+        
+        // Load the spritesheet automatically
+        this.load('assets/spritesheet.png', (err) => {
+            if (err) {
+                console.error('Failed to load spritesheet');
+            } else {
+                console.log('Spritesheet loaded successfully');
+            }
+        });
     }
 
     load(src, callback) {

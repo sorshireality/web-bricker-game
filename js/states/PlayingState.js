@@ -95,6 +95,8 @@ export class PlayingState extends GameState {
         switch(key) {
             case 'd':
                 this.debugMode = !this.debugMode;
+                this.game.spatialGrid.toggleDebug();
+                console.log("Debug mode:", this.debugMode ? "ON" : "OFF");
                 break;
             case ' ':
                 if (this.waitingForLaunch) {

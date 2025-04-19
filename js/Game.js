@@ -199,11 +199,26 @@ export class Game {
             return;
         }
         
-        // Update spatial grid
+        // Update spatial grid for collision detection
         this.spatialGrid.clear();
-        this.bricks.forEach(brick => this.spatialGrid.add(brick));
-        this.balls.forEach(ball => this.spatialGrid.add(ball));
+        
+        // Add bricks to spatial grid
+        this.bricks.forEach(brick => {
+            this.spatialGrid.add(brick);
+        });
+        
+        // Add balls to spatial grid - ensure they have proper dimensions
+        this.balls.forEach(ball => {
+            this.spatialGrid.add(ball);
+        });
+        
+        // Add paddle to spatial grid
         this.spatialGrid.add(this.paddle);
+        
+        // Add boosters to spatial grid
+        this.boosters.forEach(booster => {
+            this.spatialGrid.add(booster);
+        });
         
         // Check level completion only when all bricks are destroyed and we're not at the last level
         if (this.bricks.length === 0 && !this.gameOver && !this.levelCompleted) {

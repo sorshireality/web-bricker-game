@@ -16,6 +16,7 @@ export class Ball extends AbstractEntity {
         this.skin = new BallSkin(this, this.spriteManager);
         this.fireMode = false;
         this.launched = false;
+        this.debugCollision = false;
         console.log('Ball created:', { x, y, radius });
     }
 
@@ -166,6 +167,18 @@ export class Ball extends AbstractEntity {
     }
 
     draw(ctx) {
+        // First, draw the ball using its skin
         this.skin.draw(ctx);
+        
+        // For debugging collision box visualization
+        if (this.debugCollision) {
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+            ctx.strokeRect(
+                this.x - this.radius, 
+                this.y - this.radius, 
+                this.radius * 2, 
+                this.radius * 2
+            );
+        }
     }
 }

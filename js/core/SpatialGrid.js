@@ -96,6 +96,17 @@ export class SpatialGrid {
     // Toggle debug mode
     toggleDebug() {
         this.debugMode = !this.debugMode;
+        
+        // When disabling debug mode, also disable entity-specific debug visualizations
+        if (!this.debugMode) {
+            for (const entities of this.grid.values()) {
+                for (const entity of entities) {
+                    if (entity.debugCollision !== undefined) {
+                        entity.debugCollision = false;
+                    }
+                }
+            }
+        }
     }
 
     // Draw debug visualization
@@ -152,12 +163,26 @@ export class SpatialGrid {
         ctx.lineWidth = 2;
         for (const entities of this.grid.values()) {
             for (const entity of entities) {
-                ctx.strokeRect(
-                    entity.x,
-                    entity.y,
-                    entity.width || entity.radius * 2,
-                    entity.height || entity.radius * 2
-                );
+                // Enable each entity's debug visualization if it has one
+                if (entity.debugCollision !== undefined) {
+                    entity.debugCollision = true;
+                } else {
+                    // For entities without a custom debug visualization
+                    if (entity.radius) {
+                        // For circular entities (like balls)
+                        ctx.beginPath();
+                        ctx.arc(entity.x, entity.y, entity.radius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    } else {
+                        // For rectangular entities (like bricks and paddle)
+                        ctx.strokeRect(
+                            entity.x,
+                            entity.y,
+                            entity.width,
+                            entity.height
+                        );
+                    }
+                }
             }
         }
     }
