@@ -4,7 +4,7 @@ export class SpatialGrid {
         this.width = width;
         this.height = height;
         this.grid = new Map();
-        this.debugMode = true;
+        this.debugMode = false;
     }
 
     // Convert position to grid coordinates

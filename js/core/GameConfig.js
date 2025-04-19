@@ -52,7 +52,7 @@ export const GameConfig = {
     },
     ballConfig: {
         radius: 10,
-        baseSpeed: 50,
+        baseSpeed: 30,
         maxSpeed: 15,
         acceleration: 0.2,
         friction: 0.99,
