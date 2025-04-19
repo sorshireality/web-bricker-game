@@ -1,58 +1,46 @@
-# Bricker - A Modern Breakout Game
+# Bricker - Breakout Game
 
-A modern implementation of the classic Breakout game with smooth animations, score tracking, and combo system.
+A modern implementation of the classic Breakout game with enhanced features and mobile support.
 
 ## Features
 
-- Smooth gameplay with optimized performance
-- Score tracking with combo system
-- Event logging
-- Pause/Resume functionality
-- Modern UI with responsive design
-
-## Local Development
-
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Start development server:
-```bash
-npm start
-```
-
-The game will be available at `http://localhost:3000`
+- 🎮 Classic Breakout gameplay
+- 📱 Mobile-friendly controls
+- 🎯 Multiple levels
+- 💥 Special effects and boosters
+- 🏆 Score system with combos
+- 🎨 Modern pixel-art graphics
 
 ## Controls
 
-- Mouse: Move paddle left/right
-- ESC: Pause/Resume game
+### Desktop
+- Left/Right Arrow Keys - Move paddle
+- Space - Launch ball
+- Escape - Pause game
 
-## Building for Production
+### Mobile
+- Swipe left/right - Move paddle
+- Tap - Launch ball
 
-To create a production build:
+## Play Online
 
-```bash
-npm run build
+Play the game at: [GitHub Pages Link]
+
+## Development
+
+The game is built using vanilla JavaScript and HTML5 Canvas. No external dependencies required.
+
+### Project Structure
 ```
-
-The built files will be in the `dist` directory.
-
-## Project Structure
-
-```
-├── assets/         # Game assets (sprites, images)
+bricker/
 ├── js/
-│   ├── core/      # Core game systems
-│   ├── entities/  # Game entities (Ball, Paddle, Bricks)
-│   └── skins/     # Visual styles for entities
-├── index.html     # Main HTML file
-└── package.json   # Project configuration
+│   ├── core/         # Core game systems
+│   ├── entities/     # Game entities (Ball, Brick, Paddle)
+│   └── main.js       # Game initialization
+├── index.html        # Main HTML file
+└── README.md         # This file
 ```
 
-## Technologies Used
+## License
 
-- Vanilla JavaScript
-- HTML5 Canvas
-- Vite for development and building 
+MIT License 

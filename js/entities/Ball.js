@@ -41,10 +41,61 @@ export class Ball extends AbstractEntity {
             return;
         }
 
-        // Update position with fixed speed
+        // Calculate next position
         const speedFactor = 10;
-        this.x += this.dx * speedFactor * deltaTime;
-        this.y += this.dy * speedFactor * deltaTime;
+        const nextX = this.x + this.dx * speedFactor * deltaTime;
+        const nextY = this.y + this.dy * speedFactor * deltaTime;
+
+        // Check paddle collision with next position
+        const nextBall = {
+            x: nextX,
+            y: nextY,
+            radius: this.radius
+        };
+
+        if (this.checkCollisionWithPaddle(nextBall, game.paddle)) {
+            // Only process top surface collision if ball is moving downward
+            if (this.dy > 0) {
+                // Calculate hit position relative to paddle center (-0.5 to 0.5)
+                const hitPosition = (nextX - game.paddle.x) / game.paddle.width - 0.5;
+                
+                // Calculate reflection angle based on hit position
+                // Max angle is 60 degrees (PI/3) from vertical
+                const maxAngle = Math.PI / 3;
+                const angle = hitPosition * maxAngle;
+                
+                // Calculate new velocity components
+                const speed = GameConfig.ballConfig.baseSpeed;
+                this.dx = Math.sin(angle) * speed;
+                this.dy = -Math.abs(Math.cos(angle) * speed);
+                
+                // Ensure minimum vertical speed to prevent slow bounces
+                const minVerticalSpeed = speed * 0.5;
+                if (Math.abs(this.dy) < minVerticalSpeed) {
+                    this.dy = -minVerticalSpeed;
+                }
+                
+                // Position ball above paddle with exact collision point
+                this.y = game.paddle.y - this.radius;
+                this.x = nextX; // Keep the x position where collision happened
+                
+                // Emit collision event
+                game.events.emit(GameEvents.BALL_PADDLE_COLLISION);
+            } else {
+                // Handle side collision - just bounce horizontally
+                this.dx = -this.dx;
+                if (nextX < game.paddle.x) {
+                    this.x = game.paddle.x - this.radius;
+                } else {
+                    this.x = game.paddle.x + game.paddle.width + this.radius;
+                }
+            }
+            return; // Skip other collisions for this frame
+        }
+
+        // Update position if no collision
+        this.x = nextX;
+        this.y = nextY;
 
         // Wall collision
         if (this.x - this.radius <= 0) {
@@ -59,24 +110,6 @@ export class Ball extends AbstractEntity {
         if (this.y - this.radius <= 0) {
             this.y = this.radius;
             this.dy = Math.abs(this.dy);
-        }
-
-        // Check paddle collision first
-        if (this.checkCollision(game.paddle)) {
-            const hitPosition = (this.x - game.paddle.x) / game.paddle.width;
-            const angle = (hitPosition - 0.5) * Math.PI;
-            
-            const speed = GameConfig.ballConfig.baseSpeed;
-            this.dx = Math.sin(angle) * speed;
-            this.dy = -Math.abs(Math.cos(angle) * speed);
-            
-            this.y = game.paddle.y - this.radius - 1;
-            
-            // Only emit collision event if the ball was moving downward
-            if (this.dy > 0) {
-                game.events.emit(GameEvents.BALL_PADDLE_COLLISION);
-            }
-            return; // Skip other collisions for this frame
         }
 
         // Get potential collision candidates from spatial grid
@@ -163,6 +196,34 @@ export class Ball extends AbstractEntity {
                ballTop <= rectBottom;
     }
 
+    checkCollisionWithPaddle(ball, paddle) {
+        // Check if ball's next position would collide with paddle
+        const ballBottom = ball.y + ball.radius;
+        const ballTop = ball.y - ball.radius;
+        const ballLeft = ball.x - ball.radius;
+        const ballRight = ball.x + ball.radius;
+
+        const paddleTop = paddle.y;
+        const paddleBottom = paddle.y + paddle.height;
+        const paddleLeft = paddle.x;
+        const paddleRight = paddle.x + paddle.width;
+
+        // Check if ball is moving downward (dy > 0)
+        const isMovingDownward = this.dy > 0;
+
+        // For downward movement, only check collision with paddle's top surface
+        if (isMovingDownward) {
+            return ballBottom >= paddleTop &&
+                   ballBottom <= paddleBottom &&
+                   ballLeft <= paddleRight &&
+                   ballRight >= paddleLeft;
+        }
+
+        // For upward movement, check side collisions
+        return (ballRight >= paddleLeft && ballLeft <= paddleRight) &&
+               (ballBottom >= paddleTop && ballTop <= paddleBottom);
+    }
+
     setFireMode(enabled) {
         this.fireMode = enabled;
         this.skin.setFireMode(enabled);
@@ -186,5 +247,37 @@ export class Ball extends AbstractEntity {
                 this.radius * 2
             );
         }
+    }
+
+    split() {
+        console.log('Splitting ball');
+        const game = this.game;
+        const config = GameConfig.boosterConfig.effects.splitter;
+        
+        // Create two new balls with adjusted speed and spread angle
+        const newSpeed = this.speed * config.speedMultiplier;
+        const angle1 = this.angle - config.spreadAngle;
+        const angle2 = this.angle + config.spreadAngle;
+        
+        const ball1 = new Ball(
+            this.x,
+            this.y,
+            newSpeed,
+            angle1,
+            game,
+            this.spriteManager
+        );
+        
+        const ball2 = new Ball(
+            this.x,
+            this.y,
+            newSpeed,
+            angle2,
+            game,
+            this.spriteManager
+        );
+        
+        game.balls.push(ball1, ball2);
+        console.log('Created two new balls with speed:', newSpeed, 'and angles:', angle1, angle2);
     }
 }

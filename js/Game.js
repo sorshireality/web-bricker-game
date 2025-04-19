@@ -123,7 +123,7 @@ export class Game {
             }
         });
 
-        // Reset combo when ball hits paddle - no logging needed
+        // Reset combo when ball hits paddle
         this.events.on(GameEvents.BALL_PADDLE_COLLISION, () => {
             this.bricksDestroyedThisShot = 0;
             this.lastBrickDestroyed = false;
@@ -352,6 +352,24 @@ export class Game {
                 });
                 this.events.emit(GameEvents.BOOSTER_DEACTIVATED, { type });
             }, GameConfig.boosterConfig.effects.fire.duration);
+        }
+    }
+
+    activateFireEffect() {
+        console.log('Activating fire effect');
+        this.fireEffectActive = true;
+        this.fireEffectStartTime = Date.now();
+        this.fireEffectDuration = GameConfig.boosterConfig.effects.fire.duration;
+        console.log('Fire effect will last for:', this.fireEffectDuration, 'ms');
+    }
+
+    updateFireEffect() {
+        if (this.fireEffectActive) {
+            const elapsed = Date.now() - this.fireEffectStartTime;
+            if (elapsed >= this.fireEffectDuration) {
+                console.log('Fire effect ended');
+                this.fireEffectActive = false;
+            }
         }
     }
 

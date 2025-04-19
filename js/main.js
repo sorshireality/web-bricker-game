@@ -27,19 +27,31 @@ let lastFrameTime = performance.now();
 const targetFPS = 60;
 const frameInterval = 1000 / targetFPS;
 
+// Add device detection
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 // Initialize game
 game = new Game(canvas);
 setupEventListeners();
 requestAnimationFrame(gameLoop);
 
 function setupEventListeners() {
-    // Mouse controls
-    document.removeEventListener('mousemove', mouseMoveHandler);
-    document.addEventListener('mousemove', mouseMoveHandler);
-    
-    // Keyboard controls
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('keyup', handleKeyUp);
+    if (isMobile) {
+        // Touch controls for mobile
+        canvas.removeEventListener('touchstart', touchHandler);
+        canvas.removeEventListener('touchmove', touchHandler);
+        canvas.addEventListener('touchstart', touchHandler, { passive: false });
+        canvas.addEventListener('touchmove', touchHandler, { passive: false });
+        
+        // Prevent scrolling on mobile when touching the canvas
+        canvas.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+    } else {
+        // Keyboard controls for desktop
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+    }
     
     // Pause game
     document.addEventListener('keydown', (e) => {
@@ -85,7 +97,26 @@ function addLogMessage(message, color = '#ffffff') {
 
 function handleKeyDown(e) {
     if (gameState !== GameState.RUNNING) return;
-    game.handleInput(e.key);
+    
+    switch(e.key) {
+        case 'ArrowLeft':
+            game.paddle.setMovingLeft(true);
+            break;
+        case 'ArrowRight':
+            game.paddle.setMovingRight(true);
+            break;
+        case ' ':
+            // Launch ball on spacebar if not launched
+            if (!game.balls[0].launched) {
+                game.balls[0].launch();
+                // Clear the start message
+                const startMessage = document.querySelector('.log-message');
+                if (startMessage && startMessage.textContent.includes('press SPACE')) {
+                    startMessage.remove();
+                }
+            }
+            break;
+    }
 }
 
 function handleKeyUp(e) {
@@ -99,16 +130,28 @@ function handleKeyUp(e) {
     }
 }
 
-function mouseMoveHandler(e) {
+function touchHandler(e) {
+    e.preventDefault();
     if (gameState !== GameState.RUNNING) return;
     
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const paddleX = mouseX - game.paddle.width / 2;
+    const touch = e.touches[0];
+    const touchX = touch.clientX - rect.left;
+    const paddleX = touchX - game.paddle.width / 2;
     
     // Keep paddle within canvas bounds
     const maxPaddleX = canvas.width - game.paddle.width;
     game.paddle.x = Math.max(0, Math.min(paddleX, maxPaddleX));
+    
+    // Launch ball on touch if not launched
+    if (!game.balls[0].launched) {
+        game.balls[0].launch();
+        // Clear the start message
+        const startMessage = document.querySelector('.log-message');
+        if (startMessage && startMessage.textContent.includes('press SPACE')) {
+            startMessage.remove();
+        }
+    }
 }
 
 function togglePause() {

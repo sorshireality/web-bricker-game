@@ -63,12 +63,18 @@ export const GameConfig = {
         height: 20,
         speed: 2,
         dropChance: {
-            glass: 0.5  // 100% chance to drop splitter from glass bricks
+            glass: 0.25  // 25% chance to drop splitter from glass bricks
         },
         effects: {
             splitter: {
                 duration: 0,  // Permanent effect
-                icon: '🎯'
+                icon: '🎯',
+                speedMultiplier: 0.8,  // New balls will have 80% of original speed
+                spreadAngle: Math.PI/4  // 45 degrees spread angle
+            },
+            fire: {
+                duration: 10000,  // 10 seconds duration
+                icon: '🔥'
             }
         }
     },

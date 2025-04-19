@@ -39,6 +39,7 @@ export const GameEvents = {
     // Gameplay events
     BRICK_DESTROYED: 'brick:destroyed',
     BALL_LOST: 'ball:lost',
+    BALL_PADDLE_COLLISION: 'ball:paddle:collision',
     BOOSTER_COLLECTED: 'booster:collected',
     BOOSTER_ACTIVATED: 'booster:activated',
     BOOSTER_DEACTIVATED: 'booster:deactivated',
