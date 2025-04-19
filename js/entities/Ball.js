@@ -2,6 +2,7 @@ import { AbstractEntity } from '../core/AbstractEntity.js';
 import { BallSkin } from '../skins/BallSkin.js';
 import { GameConfig } from '../core/GameConfig.js';
 import { GameEvents } from '../core/EventSystem.js';
+import { EventSystem } from '../core/EventSystem.js';
 import { Booster } from './Booster.js';
 import { Paddle } from './Paddle.js';
 import { Brick } from './Brick.js';
@@ -17,6 +18,10 @@ export class Ball extends AbstractEntity {
         this.fireMode = false;
         this.launched = false;
         this.debugCollision = false;
+        this.powerShotActive = false;
+        this.powerShotCooldown = 0;
+        this.baseSpeed = GameConfig.ballConfig.baseSpeed;
+        this.events = new EventSystem();
         console.log('Ball created:', { x, y, radius });
     }
 
@@ -41,10 +46,19 @@ export class Ball extends AbstractEntity {
             return;
         }
 
-        // Calculate next position
-        const speedFactor = 10;
-        const nextX = this.x + this.dx * speedFactor * deltaTime;
-        const nextY = this.y + this.dy * speedFactor * deltaTime;
+        // Update power shot state
+        if (this.powerShotActive) {
+            this.powerShotCooldown -= deltaTime * 1000;
+            if (this.powerShotCooldown <= 0) {
+                this.powerShotActive = false;
+                this.resetSpeed();
+            }
+        }
+
+        // Calculate next position with speed multiplier
+        const speedMultiplier = 10; // Add speed multiplier
+        const nextX = this.x + this.dx * speedMultiplier * deltaTime;
+        const nextY = this.y + this.dy * speedMultiplier * deltaTime;
 
         // Check paddle collision with next position
         const nextBall = {
@@ -54,42 +68,6 @@ export class Ball extends AbstractEntity {
         };
 
         if (this.checkCollisionWithPaddle(nextBall, game.paddle)) {
-            // Only process top surface collision if ball is moving downward
-            if (this.dy > 0) {
-                // Calculate hit position relative to paddle center (-0.5 to 0.5)
-                const hitPosition = (nextX - game.paddle.x) / game.paddle.width - 0.5;
-                
-                // Calculate reflection angle based on hit position
-                // Max angle is 60 degrees (PI/3) from vertical
-                const maxAngle = Math.PI / 3;
-                const angle = hitPosition * maxAngle;
-                
-                // Calculate new velocity components
-                const speed = GameConfig.ballConfig.baseSpeed;
-                this.dx = Math.sin(angle) * speed;
-                this.dy = -Math.abs(Math.cos(angle) * speed);
-                
-                // Ensure minimum vertical speed to prevent slow bounces
-                const minVerticalSpeed = speed * 0.5;
-                if (Math.abs(this.dy) < minVerticalSpeed) {
-                    this.dy = -minVerticalSpeed;
-                }
-                
-                // Position ball above paddle with exact collision point
-                this.y = game.paddle.y - this.radius;
-                this.x = nextX; // Keep the x position where collision happened
-                
-                // Emit collision event
-                game.events.emit(GameEvents.BALL_PADDLE_COLLISION);
-            } else {
-                // Handle side collision - just bounce horizontally
-                this.dx = -this.dx;
-                if (nextX < game.paddle.x) {
-                    this.x = game.paddle.x - this.radius;
-                } else {
-                    this.x = game.paddle.x + game.paddle.width + this.radius;
-                }
-            }
             return; // Skip other collisions for this frame
         }
 
@@ -213,15 +191,66 @@ export class Ball extends AbstractEntity {
 
         // For downward movement, only check collision with paddle's top surface
         if (isMovingDownward) {
-            return ballBottom >= paddleTop &&
-                   ballBottom <= paddleBottom &&
-                   ballLeft <= paddleRight &&
-                   ballRight >= paddleLeft;
+            if (ballBottom >= paddleTop && 
+                ballBottom <= paddleBottom && 
+                ballLeft <= paddleRight && 
+                ballRight >= paddleLeft) {
+                
+                // Calculate hit position relative to paddle center (-0.5 to 0.5)
+                const hitPosition = (ball.x - paddle.x) / paddle.width - 0.5;
+                
+                // Check for power shot
+                if (Math.abs(hitPosition) < GameConfig.ballConfig.powerShot.hitThreshold && 
+                    !this.powerShotActive && 
+                    this.powerShotCooldown <= 0) {
+                    this.activatePowerShot();
+                }
+                
+                // Calculate reflection angle based on hit position
+                const maxAngle = Math.PI / 3;
+                const angle = hitPosition * maxAngle;
+                
+                // Calculate new velocity components
+                const speed = this.powerShotActive ? 
+                    this.baseSpeed * GameConfig.ballConfig.powerShot.speedMultiplier : 
+                    this.baseSpeed;
+                
+                this.dx = Math.sin(angle) * speed;
+                this.dy = -Math.abs(Math.cos(angle) * speed);
+                
+                // Ensure minimum vertical speed
+                const minVerticalSpeed = speed * 0.5;
+                if (Math.abs(this.dy) < minVerticalSpeed) {
+                    this.dy = -minVerticalSpeed;
+                }
+                
+                // Position ball above paddle
+                this.y = paddle.y - this.radius;
+                
+                // Emit collision event
+                if (this.events && typeof this.events.emit === 'function') {
+                    this.events.emit(GameEvents.BALL_PADDLE_COLLISION);
+                }
+                return true;
+            }
         }
-
+        
         // For upward movement, check side collisions
-        return (ballRight >= paddleLeft && ballLeft <= paddleRight) &&
-               (ballBottom >= paddleTop && ballTop <= paddleBottom);
+        if (!isMovingDownward) {
+            if ((ballRight >= paddleLeft && ballLeft <= paddleRight) &&
+                (ballBottom >= paddleTop && ballTop <= paddleBottom)) {
+                // Handle side collision - just bounce horizontally
+                this.dx = -this.dx;
+                if (ball.x < paddle.x) {
+                    this.x = paddle.x - this.radius;
+                } else {
+                    this.x = paddle.x + paddle.width + this.radius;
+                }
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     setFireMode(enabled) {
@@ -279,5 +308,25 @@ export class Ball extends AbstractEntity {
         
         game.balls.push(ball1, ball2);
         console.log('Created two new balls with speed:', newSpeed, 'and angles:', angle1, angle2);
+    }
+
+    activatePowerShot() {
+        this.powerShotActive = true;
+        this.powerShotCooldown = GameConfig.ballConfig.powerShot.cooldown;
+        const speed = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
+        const angle = Math.atan2(this.dy, this.dx);
+        const newSpeed = speed * GameConfig.ballConfig.powerShot.speedMultiplier;
+        this.dx = Math.cos(angle) * newSpeed;
+        this.dy = Math.sin(angle) * newSpeed;
+        console.log('Power shot activated!');
+    }
+
+    resetSpeed() {
+        const speed = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
+        const angle = Math.atan2(this.dy, this.dx);
+        const newSpeed = this.baseSpeed;
+        this.dx = Math.cos(angle) * newSpeed;
+        this.dy = Math.sin(angle) * newSpeed;
+        console.log('Power shot deactivated, speed reset');
     }
 }

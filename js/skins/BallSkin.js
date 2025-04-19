@@ -6,6 +6,7 @@ export class BallSkin extends AbstractSkin {
         this.color = color;
         this.ballSpriteKey = 'ball'; // Key for the ball sprite (if defined in SPRITES)
         this.fireMode = false;
+        this.powerShotColor = '#FFD700'; // Gold color for power shot
     }
 
     setFireMode(enabled) {
@@ -56,11 +57,22 @@ export class BallSkin extends AbstractSkin {
         
         // Fallback to drawing a solid color ball if sprite drawing failed
         if (!drawnWithSprite) {
-            ctx.fillStyle = this.color;
+            // Draw ball with power shot effect
+            if (this.entity.powerShotActive) {
+                // Draw outer glow for power shot
+                ctx.beginPath();
+                ctx.arc(this.entity.x, this.entity.y, this.entity.radius + 2, 0, Math.PI * 2);
+                ctx.fillStyle = this.powerShotColor;
+                ctx.globalAlpha = 0.5;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Draw main ball
             ctx.beginPath();
             ctx.arc(this.entity.x, this.entity.y, this.entity.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.fireMode ? this.color : (this.entity.powerShotActive ? this.powerShotColor : this.color);
             ctx.fill();
-            ctx.closePath();
 
             // Draw fire effect if in fire mode
             if (this.fireMode) {

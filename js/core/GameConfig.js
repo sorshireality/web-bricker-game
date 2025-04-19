@@ -56,7 +56,14 @@ export const GameConfig = {
         maxSpeed: 15,
         acceleration: 0.2,
         friction: 0.99,
-        spinFactor: 0.5
+        spinFactor: 0.5,
+        powerShot: {
+            enabled: true,
+            speedMultiplier: 1.5,  // 50% speed increase
+            duration: 1000,        // 1 second duration
+            cooldown: 2000,        // 2 seconds cooldown
+            hitThreshold: 0.8      // Must hit within 80% of paddle center for power shot
+        }
     },
     boosterConfig: {
         width: 20,
