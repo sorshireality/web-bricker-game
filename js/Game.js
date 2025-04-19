@@ -15,10 +15,6 @@ export class Game {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.boosters = [];
-        this.activeBoosters = {
-            splitter: false,
-            fire: false
-        };
         this.score = 0;
         this.level = 1;
         this.bricks = [];
@@ -178,6 +174,12 @@ export class Game {
         this.levelCompleted = false;
         this.bricks = [];
         
+        // Reset active boosters
+        this.activeBoosters = {
+            splitter: false,
+            fire: false
+        };
+        
         // Setup bricks for current level
         const levelConfig = GameConfig.levels[this.level - 1];
         const brickWidth = GameConfig.brickConfig.width;
@@ -241,6 +243,14 @@ export class Game {
             return;
         }
         
+        // Reset active boosters if we have only one ball left
+        if (this.balls.length === 1) {
+            this.activeBoosters = {
+                splitter: false,
+                fire: false
+            };
+        }
+        
         // Update spatial grid for collision detection
         this.spatialGrid.clear();
         
@@ -300,23 +310,20 @@ export class Game {
     }
 
     activateBooster(type) {
-        if (this.activeBoosters[type]) {
-            return; // Booster already active
-        }
-
-        this.activeBoosters[type] = true;
-        
+        // Always activate the booster when collected
         if (type === 'splitter') {
-            // Split all existing balls
-            const newBalls = [];
-            this.balls.forEach(ball => {
-                // Create two new balls at the same position as the original
-                const ball1 = new Ball(ball.x, ball.y, ball.radius, this.spriteManager);
-                const ball2 = new Ball(ball.x, ball.y, ball.radius, this.spriteManager);
+            // Choose one random ball to split
+            if (this.balls.length > 0) {
+                const randomIndex = Math.floor(Math.random() * this.balls.length);
+                const ballToSplit = this.balls[randomIndex];
+                
+                // Create two new balls at the same position as the chosen ball
+                const ball1 = new Ball(ballToSplit.x, ballToSplit.y, ballToSplit.radius, this.spriteManager);
+                const ball2 = new Ball(ballToSplit.x, ballToSplit.y, ballToSplit.radius, this.spriteManager);
                 
                 // Set velocities for new balls
-                const angle = Math.atan2(ball.dy, ball.dx);
-                const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+                const angle = Math.atan2(ballToSplit.dy, ballToSplit.dx);
+                const speed = Math.sqrt(ballToSplit.dx * ballToSplit.dx + ballToSplit.dy * ballToSplit.dy);
                 
                 // First ball goes slightly left
                 ball1.dx = speed * Math.cos(angle - Math.PI/6);
@@ -328,11 +335,10 @@ export class Game {
                 ball2.dy = speed * Math.sin(angle + Math.PI/6);
                 ball2.launched = true;
                 
-                newBalls.push(ball1, ball2);
-            });
-            
-            // Add new balls to existing ones
-            this.balls.push(...newBalls);
+                // Add new balls to the game
+                this.balls.push(ball1, ball2);
+                console.log('Splitter activated: created two new balls from one existing ball');
+            }
         } else if (type === 'fire') {
             // Activate fire mode for all balls
             this.balls.forEach(ball => {
@@ -341,13 +347,10 @@ export class Game {
             
             // Deactivate after duration
             setTimeout(() => {
-                if (this.activeBoosters[type]) { // Check if still active
-                    this.activeBoosters[type] = false;
-                    this.balls.forEach(ball => {
-                        ball.setFireMode(false);
-                    });
-                    this.events.emit(GameEvents.BOOSTER_DEACTIVATED, { type });
-                }
+                this.balls.forEach(ball => {
+                    ball.setFireMode(false);
+                });
+                this.events.emit(GameEvents.BOOSTER_DEACTIVATED, { type });
             }, GameConfig.boosterConfig.effects.fire.duration);
         }
     }

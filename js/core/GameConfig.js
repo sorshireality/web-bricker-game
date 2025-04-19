@@ -63,7 +63,7 @@ export const GameConfig = {
         height: 20,
         speed: 2,
         dropChance: {
-            glass: 1.0  // 100% chance to drop splitter from glass bricks
+            glass: 0.5  // 100% chance to drop splitter from glass bricks
         },
         effects: {
             splitter: {
