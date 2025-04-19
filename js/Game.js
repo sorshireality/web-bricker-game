@@ -68,7 +68,7 @@ export class Game {
         this.events.off(GameEvents.BALL_PADDLE_COLLISION);
         this.events.off(GameEvents.GAME_OVER);
         this.events.off(GameEvents.GAME_COMPLETED);
-        this.events.off(GameEvents.LEVEL_COMPLETED);
+        this.events.off(GameEvents.LEVEL_COMPLETE);
         this.events.off(GameEvents.BOOSTER_ACTIVATED);
 
         // Score updates with combo system
@@ -127,8 +127,7 @@ export class Game {
         });
 
         // Level progression
-        this.events.on(GameEvents.LEVEL_COMPLETED, () => {
-            this.level++;
+        this.events.on(GameEvents.LEVEL_COMPLETE, () => {
             const levelValue = document.getElementById('levelValue');
             if (levelValue) {
                 levelValue.textContent = this.level;
@@ -156,34 +155,38 @@ export class Game {
     }
 
     setupLevel() {
+        // Reset level completion state
+        this.levelCompleted = false;
         this.bricks = [];
-        this.levelCompleted = false;  // Reset the level completed flag
+        
+        // Setup bricks for current level
         const levelConfig = GameConfig.levels[this.level - 1];
         const brickWidth = GameConfig.brickConfig.width;
         const brickHeight = GameConfig.brickConfig.height;
         const padding = GameConfig.brickConfig.padding;
         const offsetTop = GameConfig.brickConfig.offsetTop;
-
-        // Calculate total width of the brick grid
+        
+        // Calculate total width of brick grid
         const totalWidth = levelConfig.brickColumns * (brickWidth + padding) - padding;
-        // Calculate starting x position to center the grid
         const startX = (this.canvas.width - totalWidth) / 2;
-
+        
+        // Create bricks
         for (let row = 0; row < levelConfig.brickRows; row++) {
             for (let col = 0; col < levelConfig.brickColumns; col++) {
                 const x = startX + col * (brickWidth + padding);
-                const y = row * (brickHeight + padding) + offsetTop;
+                const y = offsetTop + row * (brickHeight + padding);
                 const type = Math.random() < levelConfig.brickDistribution.glass ? 'glass' : 'wooden';
                 this.bricks.push(new Brick(x, y, type, this.spriteManager));
             }
         }
-
-        // Reset balls with proper radius and position
-        const ballRadius = GameConfig.ballConfig.radius;
-        const ballX = this.paddle.x + this.paddle.width / 2;
-        const ballY = this.paddle.y - ballRadius - 10;
-        this.balls = [new Ball(ballX, ballY, ballRadius, this.spriteManager)];
         
+        // Reset balls
+        this.balls = [];
+        const ballX = this.paddle.x + this.paddle.width / 2;
+        const ballY = this.paddle.y - GameConfig.ballConfig.radius - 10;
+        this.balls.push(new Ball(ballX, ballY, GameConfig.ballConfig.radius, this.spriteManager));
+        
+        // Emit level start event
         this.events.emit(GameEvents.LEVEL_START, { level: this.level });
     }
 
@@ -220,18 +223,7 @@ export class Game {
             this.spatialGrid.add(booster);
         });
         
-        // Check level completion only when all bricks are destroyed and we're not at the last level
-        if (this.bricks.length === 0 && !this.gameOver && !this.levelCompleted) {
-            if (this.level < GameConfig.levels.length) {
-                this.levelCompleted = true;
-                this.events.emit(GameEvents.LEVEL_COMPLETED);
-                this.setupLevel();
-            } else {
-                this.gameCompleted = true;
-                this.events.emit(GameEvents.GAME_COMPLETED);
-            }
-        }
-        
+        // Let the current state handle the game logic (including level completion)
         this.stateManager.update(deltaTime);
     }
 
