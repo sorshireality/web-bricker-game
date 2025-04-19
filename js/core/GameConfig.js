@@ -37,8 +37,8 @@ export const GameConfig = {
         }
     ],
     brickConfig: {
-        width: 48,
-        height: 20,
+        width: 42,
+        height: 21,
         padding: 5,
         offsetTop: 30
     },

@@ -1,19 +1,30 @@
 import { GameConfig } from '../core/GameConfig.js';
+import { AbstractEntity } from '../core/AbstractEntity.js';
+import { GlassBrickSkin } from '../skins/GlassBrickSkin.js';
+import { WoodBrickSkin } from '../skins/WoodBrickSkin.js';
 
-export class Brick {
+export class Brick extends AbstractEntity {
     constructor(x, y, type, spriteManager) {
-        this.x = x;
-        this.y = y;
+        super(x, y);
         this.type = type;
         this.width = GameConfig.brickConfig.width;
         this.height = GameConfig.brickConfig.height;
         this.hp = this.getInitialHP();
         this.active = true;
         this.spriteManager = spriteManager;
+        
+        // Initialize the appropriate skin based on brick type
+        this.skin = type === 'wooden' ? 
+            new WoodBrickSkin(this, spriteManager) : 
+            new GlassBrickSkin(this, spriteManager);
     }
 
     getInitialHP() {
         return this.type === 'wooden' ? 2 : 1;
+    }
+
+    getHealthPercentage() {
+        return this.hp / this.getInitialHP();
     }
 
     hit() {
@@ -35,22 +46,7 @@ export class Brick {
 
     draw(ctx) {
         if (!this.active) return;
-        
-        ctx.fillStyle = this.type === 'wooden' ? '#8B4513' : '#87CEEB';
-        ctx.fillRect(this.x, this.y, this.width, this.height);
-        
-        // Draw border
-        ctx.strokeStyle = '#000';
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
-        
-        // Draw HP for wooden bricks
-        if (this.type === 'wooden') {
-            ctx.fillStyle = '#FFF';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(this.hp.toString(), this.x + this.width/2, this.y + this.height/2);
-        }
+        this.skin.draw(ctx);
     }
 
     shouldDropBooster() {

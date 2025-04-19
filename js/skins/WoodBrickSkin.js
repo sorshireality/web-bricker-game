@@ -3,7 +3,7 @@ import { AbstractSkin } from '../core/AbstractSkin.js';
 export class WoodBrickSkin extends AbstractSkin {
     constructor(brick, spriteManager) {
         super(brick, spriteManager);
-        this.spriteKey = 'brick_red'; // Use the red brick sprite for wood bricks
+        this.spriteKey = 'brick_blue'; // Temporary use blue brick sprite with tint
     }
 
     draw(ctx) {
@@ -14,6 +14,10 @@ export class WoodBrickSkin extends AbstractSkin {
         if (this.spriteManager && this.spriteManager.ready && this.spriteManager.spriteData[this.spriteKey]) {
             try {
                 ctx.save();
+                
+                // Apply brown tint to make it look like wood
+                ctx.fillStyle = 'rgba(139, 69, 19, 0.5)'; // Brown tint
+                ctx.globalCompositeOperation = 'overlay';
                 
                 // Apply slight tinting based on health
                 if (healthPercentage < 1) {
@@ -28,6 +32,19 @@ export class WoodBrickSkin extends AbstractSkin {
                     this.entity.width, 
                     this.entity.height
                 );
+                
+                // Add wood grain effect
+                ctx.strokeStyle = 'rgba(101, 67, 33, 0.8)'; // Dark brown
+                ctx.lineWidth = 1;
+                
+                // Draw vertical grain lines
+                for (let i = 0; i < 3; i++) {
+                    const x = this.entity.x + (this.entity.width / 3) * (i + 1);
+                    ctx.beginPath();
+                    ctx.moveTo(x, this.entity.y);
+                    ctx.lineTo(x, this.entity.y + this.entity.height);
+                    ctx.stroke();
+                }
                 
                 // Add damage overlay if health is less than 100%
                 if (healthPercentage < 1) {
