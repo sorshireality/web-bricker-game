@@ -1,7 +1,7 @@
 import { AbstractEntity } from '../core/AbstractEntity.js';
 
 export class AbstractBrick extends AbstractEntity {
-    constructor(x, y, width, height, maxHealth = 1) {
+    constructor(x, y, width, height, health, spriteManager = null) {
         // Prevent direct instantiation of AbstractBrick
         if (new.target === AbstractBrick) {
             throw new TypeError("Cannot construct AbstractBrick instances directly");
@@ -9,16 +9,18 @@ export class AbstractBrick extends AbstractEntity {
         super(x, y);
         this.width = width;
         this.height = height;
-        this.maxHealth = maxHealth;
-        this.health = this.maxHealth;
-        // Skin must be assigned by the concrete subclass (e.g., StarBrick)
+        this.maxHealth = health;
+        this.health = health;
+        this.spriteManager = spriteManager;
     }
 
     hit() {
-        if (this.health > 0) {
-            this.health--;
-            console.log(`Brick hit! Health: ${this.health}/${this.maxHealth}`); // Debug log
-        }
+        this.health--;
+        return this.health <= 0;
+    }
+
+    getHealthPercentage() {
+        return this.health / this.maxHealth;
     }
 
     isDestroyed() {

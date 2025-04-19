@@ -34,29 +34,53 @@
             padding: 15px;
             display: flex;
             flex-direction: column;
-            height: 480px; /* Match canvas height */
+            height: 480px;
         }
 
-        .score-display {
-            padding: 10px;
+        .game-info {
+            display: flex;
+            justify-content: space-between;
             margin-bottom: 15px;
+        }
+
+        .score-display, .level-display {
+            padding: 10px;
             background: rgba(0, 0, 0, 0.2);
             border-radius: 4px;
             text-align: center;
+            flex: 1;
+            margin: 0 5px;
         }
 
-        .score-value {
-            font-size: 32px;
+        .score-value, .level-value {
+            font-size: 24px;
             font-weight: bold;
             color: #ffcc00;
-            margin: 10px 0;
+            margin: 5px 0;
         }
 
-        .score-label {
-            font-size: 14px;
+        .score-label, .level-label {
+            font-size: 12px;
             color: #aaa;
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+
+        .start-button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .start-button:hover {
+            background: #45a049;
         }
 
         .log-container {
@@ -65,9 +89,7 @@
             background: rgba(0, 0, 0, 0.2);
             border-radius: 4px;
             padding: 10px;
-            max-height: calc(100% - 120px); /* Account for score display height */
-            display: flex;
-            flex-direction: column;
+            margin-top: 10px;
         }
 
         .log-title {
@@ -77,7 +99,6 @@
             letter-spacing: 1px;
             margin-bottom: 10px;
             text-align: center;
-            flex-shrink: 0;
         }
 
         .log-messages {
@@ -85,7 +106,7 @@
             flex-direction: column-reverse;
             overflow-y: auto;
             flex: 1;
-            min-height: 0; /* Important for Firefox */
+            min-height: 0;
         }
 
         .log-message {
@@ -130,10 +151,15 @@
 <div class="game-container">
     <canvas id="gameCanvas" width="480" height="480"></canvas>
     <div class="sidebar">
-        <div class="score-display">
-            <div class="score-label">SCORE</div>
-            <div class="score-value" id="scoreValue">0</div>
-            <div id="comboDisplay"></div>
+        <div class="game-info">
+            <div class="score-display">
+                <div class="score-label">SCORE</div>
+                <div class="score-value" id="scoreValue">0</div>
+            </div>
+            <div class="level-display">
+                <div class="level-label">LEVEL</div>
+                <div class="level-value" id="levelValue">1</div>
+            </div>
         </div>
         <div class="log-container">
             <div class="log-title">EVENT LOG</div>

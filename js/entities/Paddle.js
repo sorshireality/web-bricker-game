@@ -8,17 +8,28 @@ export class Paddle extends AbstractEntity {
         this.height = height;
         this.spriteManager = spriteManager;
         this.skin = new PaddleSkin(this, this.spriteManager); // Pass instance and manager
+        this.speed = 7; // Movement speed for keyboard controls
+        this.movingLeft = false;
+        this.movingRight = false;
     }
 
     update(canvas) {
-        // TODO: Implement paddle movement (e.g., follow mouse)
-        // Example: Keep paddle within bounds
-        if (this.x < 0) {
-            this.x = 0;
+        if (this.movingLeft) {
+            this.x = Math.max(0, this.x - this.speed);
         }
-        if (this.x + this.width > canvas.width) {
-            this.x = canvas.width - this.width;
+        if (this.movingRight) {
+            this.x = Math.min(canvas.width - this.width, this.x + this.speed);
         }
     }
+
+    setMovingLeft(moving) {
+        this.movingLeft = moving;
+    }
+
+    setMovingRight(moving) {
+        this.movingRight = moving;
+    }
+
     // draw() is inherited
 }
+

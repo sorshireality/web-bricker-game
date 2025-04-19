@@ -1,9 +1,13 @@
 // ==== GAME SETUP ====
 import { Game } from './Game.js';
 import { Log } from './entities/Log.js';
+import { GameEvents } from './core/EventSystem.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const scoreValue = document.getElementById('scoreValue');
+const levelValue = document.getElementById('levelValue');
+const logMessages = document.getElementById('logMessages');
 
 if (!canvas) {
     throw new Error("Fatal Error: Canvas element not found!");
@@ -11,53 +15,22 @@ if (!canvas) {
 
 // Game state management
 const GameState = {
-    MENU: 'menu',
     RUNNING: 'running',
-    PAUSED: 'paused',
-    GAME_OVER: 'game_over',
-    LEVEL_COMPLETE: 'level_complete'
+    PAUSED: 'paused'
 };
 
-let gameState = GameState.MENU;
+let gameState = GameState.RUNNING;
 let game;
-let log;
 
 // Performance optimization
-let lastFrameTime = 0;
+let lastFrameTime = performance.now();
 const targetFPS = 60;
 const frameInterval = 1000 / targetFPS;
 
-// Create start button
-const startButton = document.createElement('button');
-startButton.textContent = 'Start Game';
-startButton.style.position = 'fixed';
-startButton.style.top = '50%';
-startButton.style.left = '42%';
-startButton.style.transform = 'translate(-50%, -50%)';
-startButton.style.padding = '15px 30px';
-startButton.style.fontSize = '20px';
-startButton.style.cursor = 'pointer';
-startButton.style.backgroundColor = '#4CAF50';
-startButton.style.color = 'white';
-startButton.style.border = 'none';
-startButton.style.borderRadius = '5px';
-startButton.style.zIndex = '1000';
-startButton.style.display = 'block';
-document.body.appendChild(startButton);
-
-startButton.addEventListener('click', () => {
-    startButton.style.display = 'none';
-    initializeGame();
-});
-
-function initializeGame() {
-    log = new Log();
-    log.addMessage("Game started! Break those bricks!", "#00ff00");
-    game = new Game(canvas);
-    setupEventListeners();
-    gameState = GameState.RUNNING;
-    requestAnimationFrame(gameLoop);
-}
+// Initialize game
+game = new Game(canvas);
+setupEventListeners();
+requestAnimationFrame(gameLoop);
 
 function setupEventListeners() {
     // Mouse controls
@@ -75,26 +48,44 @@ function setupEventListeners() {
         }
     });
 
-    // Click handling for restart button
-    canvas.addEventListener('click', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        game.handleClick(x, y);
+    // Game events
+    game.events.on(GameEvents.SCORE_CHANGED, ({ score, combo, scoreGain }) => {
+        scoreValue.textContent = score;
     });
+
+    game.events.on(GameEvents.LEVEL_CHANGED, ({ level }) => {
+        levelValue.textContent = level;
+    });
+
+    game.events.on(GameEvents.LOG_MESSAGE, ({ message, color = '#ffffff' }) => {
+        addLogMessage(message, color);
+    });
+
+    game.events.on(GameEvents.GAME_OVER, () => {
+        addLogMessage('Game Over!', '#ff0000');
+    });
+
+    game.events.on(GameEvents.GAME_COMPLETED, () => {
+        addLogMessage('Congratulations! You completed all levels!', '#00ff00');
+    });
+}
+
+function addLogMessage(message, color = '#ffffff') {
+    const messageElement = document.createElement('div');
+    messageElement.className = 'log-message';
+    messageElement.textContent = message;
+    messageElement.style.color = color;
+    logMessages.insertBefore(messageElement, logMessages.firstChild);
+    
+    // Limit log messages to 10
+    while (logMessages.children.length > 10) {
+        logMessages.removeChild(logMessages.lastChild);
+    }
 }
 
 function handleKeyDown(e) {
     if (gameState !== GameState.RUNNING) return;
-    
-    switch(e.key) {
-        case 'ArrowLeft':
-            game.paddle.setMovingLeft(true);
-            break;
-        case 'ArrowRight':
-            game.paddle.setMovingRight(true);
-            break;
-    }
+    game.handleInput(e.key);
 }
 
 function handleKeyUp(e) {
@@ -112,44 +103,32 @@ function mouseMoveHandler(e) {
     if (gameState !== GameState.RUNNING) return;
     
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    let mouseX = (e.clientX - rect.left) * scaleX;
-
-    if (game.paddle) {
-        game.paddle.x = Math.max(0, Math.min(mouseX - game.paddle.width / 2, canvas.width - game.paddle.width));
-    }
+    const mouseX = e.clientX - rect.left;
+    const paddleX = mouseX - game.paddle.width / 2;
+    
+    // Keep paddle within canvas bounds
+    const maxPaddleX = canvas.width - game.paddle.width;
+    game.paddle.x = Math.max(0, Math.min(paddleX, maxPaddleX));
 }
 
 function togglePause() {
     if (gameState === GameState.RUNNING) {
         gameState = GameState.PAUSED;
-        log.addMessage("Game Paused", "#ffff00");
-    } else if (gameState === GameState.PAUSED) {
+        addLogMessage("Game paused", "#ffcc00");
+    } else {
         gameState = GameState.RUNNING;
-        log.addMessage("Game Resumed", "#00ff00");
-        requestAnimationFrame(gameLoop);
+        addLogMessage("Game resumed", "#00ff00");
     }
 }
 
-// ==== GAME LOOP ====
 function gameLoop(timestamp) {
-    if (gameState !== GameState.RUNNING) return;
-
-    // Frame rate limiting
-    const elapsed = timestamp - lastFrameTime;
-    if (elapsed < frameInterval) {
-        requestAnimationFrame(gameLoop);
-        return;
-    }
+    const deltaTime = (timestamp - lastFrameTime) / 1000; // Convert to seconds
     lastFrameTime = timestamp;
 
-    // Update and draw game
-    game.update();
-    game.draw();
-
-    // Update score display
-    document.getElementById('scoreValue').textContent = game.score;
-    document.getElementById('levelValue').textContent = game.level;
-
+    if (gameState === GameState.RUNNING) {
+        game.update(deltaTime);
+        game.draw();
+    }
+    
     requestAnimationFrame(gameLoop);
 }

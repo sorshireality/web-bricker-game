@@ -45,78 +45,32 @@ export class CollisionDetector {
         };
 
         let bricksHit = 0;
+        let destroyedBricks = [];
+        let remainingBricks = [];
 
         for (let i = 0; i < bricks.length; i++) {
             const brick = bricks[i];
-            if (!brick || brick.isDestroyed()) continue; // Skip if brick doesn't exist or already destroyed
+            if (brick.isDestroyed()) continue;
 
-            // --- AABB Collision Check ---
-            const ballLeft = ball.x - ball.radius;
-            const ballRight = ball.x + ball.radius;
-            const ballTop = ball.y - ball.radius;
-            const ballBottom = ball.y + ball.radius;
-
-            const brickLeft = brick.x;
-            const brickRight = brick.x + brick.width;
-            const brickTop = brick.y;
-            const brickBottom = brick.y + brick.height;
-
-            // Check for overlap
-            if (ballRight > brickLeft &&
-                ballLeft < brickRight &&
-                ballBottom > brickTop &&
-                ballTop < brickBottom)
-            {
-                // --- Collision Detected ---
-                console.log("Brick Hit!"); // Debug log
-                brick.hit(); // Reduce brick health
-
-                if (brick.isDestroyed()) {
-                    bricksHit++; // Count this as a break only if destroyed
+            if (this.checkBallBrick(ball, brick)) {
+                bricksHit++;
+                if (brick.hit()) {
+                    destroyedBricks.push(brick);
+                } else {
+                    remainingBricks.push(brick);
                 }
-
-                // --- Determine Bounce Direction (Simple Approach) ---
-                // A common simple way is to reverse vertical velocity.
-                // More complex logic could check which side was hit.
-                // Let's find the overlap amounts to guess the side.
-                const overlapLeft = ballRight - brickLeft;
-                const overlapRight = brickRight - ballLeft;
-                const overlapTop = ballBottom - brickTop;
-                const overlapBottom = brickBottom - ballTop;
-
-                // Find the minimum overlap (indicates the side of penetration)
-                const minOverlapX = Math.min(overlapLeft, overlapRight);
-                const minOverlapY = Math.min(overlapTop, overlapBottom);
-
-                // If horizontal overlap is smaller, it's a side hit
-                if (minOverlapX < minOverlapY) {
-                    ball.dx = -ball.dx; // Reverse horizontal direction
-                    // Adjust position slightly to prevent sticking
-                    ball.x += (overlapLeft < overlapRight ? -overlapLeft : overlapRight) / 2 * (ball.dx > 0 ? 1 : -1);
-
-                } else { // Otherwise, it's a top/bottom hit
-                    ball.dy = -ball.dy; // Reverse vertical direction
-                    // Adjust position slightly
-                    ball.y += (overlapTop < overlapBottom ? -overlapTop : overlapBottom) / 2 * (ball.dy > 0 ? 1 : -1);
-                }
-
-
-                // --- Optional: Add Score ---
-                // score += 10; // Assuming 'score' is a global or accessible variable
-
-                // --- Important: Break after first hit per frame ---
-                // Prevents hitting multiple bricks simultaneously in one physics step
-                break;
+            } else {
+                remainingBricks.push(brick);
             }
         }
 
-        const remainingBricks = bricks.filter(brick => !brick.isDestroyed());
-
         return {
             bricks: remainingBricks,
-            bricksHit
+            bricksHit,
+            destroyedBricks
         };
     }
+
     /**
      * Checks for and handles collision between the ball and the canvas boundaries.
      * @param {Ball} ball - The ball object.
@@ -159,6 +113,66 @@ export class CollisionDetector {
         }
 
         return hitGround;
+    }
+
+    static checkCoinPaddle(coin, paddle) {
+        // Check if coin is within paddle's bounds
+        const coinLeft = coin.x - coin.radius;
+        const coinRight = coin.x + coin.radius;
+        const coinBottom = coin.y + coin.radius;
+        
+        const paddleLeft = paddle.x;
+        const paddleRight = paddle.x + paddle.width;
+        const paddleTop = paddle.y;
+        
+        return coinBottom >= paddleTop && 
+               coinRight >= paddleLeft && 
+               coinLeft <= paddleRight;
+    }
+
+    static checkBallBrick(ball, brick) {
+        // AABB Collision Check
+        const ballLeft = ball.x - ball.radius;
+        const ballRight = ball.x + ball.radius;
+        const ballTop = ball.y - ball.radius;
+        const ballBottom = ball.y + ball.radius;
+
+        const brickLeft = brick.x;
+        const brickRight = brick.x + brick.width;
+        const brickTop = brick.y;
+        const brickBottom = brick.y + brick.height;
+
+        // Check for overlap
+        if (ballRight > brickLeft &&
+            ballLeft < brickRight &&
+            ballBottom > brickTop &&
+            ballTop < brickBottom)
+        {
+            // Determine Bounce Direction
+            const overlapLeft = ballRight - brickLeft;
+            const overlapRight = brickRight - ballLeft;
+            const overlapTop = ballBottom - brickTop;
+            const overlapBottom = brickBottom - ballTop;
+
+            // Find the minimum overlap (indicates the side of penetration)
+            const minOverlapX = Math.min(overlapLeft, overlapRight);
+            const minOverlapY = Math.min(overlapTop, overlapBottom);
+
+            // If horizontal overlap is smaller, it's a side hit
+            if (minOverlapX < minOverlapY) {
+                ball.dx = -ball.dx; // Reverse horizontal direction
+                // Adjust position slightly to prevent sticking
+                ball.x += (overlapLeft < overlapRight ? -overlapLeft : overlapRight) / 2 * (ball.dx > 0 ? 1 : -1);
+            } else { // Otherwise, it's a top/bottom hit
+                ball.dy = -ball.dy; // Reverse vertical direction
+                // Adjust position slightly
+                ball.y += (overlapTop < overlapBottom ? -overlapTop : overlapBottom) / 2 * (ball.dy > 0 ? 1 : -1);
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     // Add other collision checks here later (e.g., ball vs walls if needed differently than boundary checks)

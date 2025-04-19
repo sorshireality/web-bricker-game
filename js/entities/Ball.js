@@ -1,61 +1,159 @@
 import { AbstractEntity } from '../core/AbstractEntity.js';
 import { BallSkin } from '../skins/BallSkin.js';
 import { GameConfig } from '../core/GameConfig.js';
+import { GameEvents } from '../core/EventSystem.js';
+import { Booster } from './Booster.js';
+import { Paddle } from './Paddle.js';
+import { Brick } from './Brick.js';
 
 export class Ball extends AbstractEntity {
     constructor(x, y, radius, spriteManager = null) {
         super(x, y);
         this.radius = radius;
         this.dx = 0;
-        this.dy = -GameConfig.ballConfig.baseSpeed;
+        this.dy = 0;
         this.spriteManager = spriteManager;
         this.skin = new BallSkin(this, this.spriteManager);
         this.fireMode = false;
+        this.launched = false;
+        console.log('Ball created:', { x, y, radius });
     }
 
-    update(canvas, paddle) {
-        // Update position
-        this.x += this.dx;
-        this.y += this.dy;
-
-        // Wall collisions
-        if (this.x - this.radius <= 0 || this.x + this.radius >= canvas.width) {
-            this.dx = -this.dx;
-            // Ensure ball stays within bounds
-            this.x = Math.max(this.radius, Math.min(this.x, canvas.width - this.radius));
+    launch() {
+        if (!this.launched) {
+            const speed = GameConfig.ballConfig.baseSpeed;
+            this.dx = speed;
+            this.dy = -speed;
+            this.launched = true;
+            console.log('Ball launched:', { dx: this.dx, dy: this.dy });
         }
+    }
+
+    update(deltaTime, game) {
+        if (!game) {
+            return;
+        }
+
+        if (!this.launched) {
+            // Follow paddle
+            this.x = game.paddle.x + game.paddle.width / 2;
+            return;
+        }
+
+        // Update position with fixed speed
+        const speedFactor = 10;
+        this.x += this.dx * speedFactor * deltaTime;
+        this.y += this.dy * speedFactor * deltaTime;
+
+        // Wall collision
+        if (this.x - this.radius <= 0) {
+            this.x = this.radius;
+            this.dx = Math.abs(this.dx);
+        } else if (this.x + this.radius >= game.canvas.width) {
+            this.x = game.canvas.width - this.radius;
+            this.dx = -Math.abs(this.dx);
+        }
+
+        // Ceiling collision
         if (this.y - this.radius <= 0) {
-            this.dy = -this.dy;
             this.y = this.radius;
+            this.dy = Math.abs(this.dy);
         }
 
-        // Paddle collision
-        if (this.y + this.radius >= paddle.y && 
-            this.y - this.radius <= paddle.y + paddle.height &&
-            this.x + this.radius >= paddle.x && 
-            this.x - this.radius <= paddle.x + paddle.width) {
+        // Check paddle collision first
+        if (this.checkCollision(game.paddle)) {
+            const hitPosition = (this.x - game.paddle.x) / game.paddle.width;
+            const angle = (hitPosition - 0.5) * Math.PI;
             
-            // Calculate where on the paddle the ball hit (0 to 1)
-            const hitPosition = (this.x - paddle.x) / paddle.width;
-            
-            // Adjust angle based on where the ball hit the paddle
-            const angle = (hitPosition - 0.5) * Math.PI / 3; // 60 degrees max angle
-            
-            // Normalize speed to base speed
             const speed = GameConfig.ballConfig.baseSpeed;
             this.dx = Math.sin(angle) * speed;
-            this.dy = -Math.cos(angle) * speed;
+            this.dy = -Math.abs(Math.cos(angle) * speed);
             
-            // Ensure ball doesn't get stuck in paddle
-            this.y = paddle.y - this.radius;
+            this.y = game.paddle.y - this.radius - 1;
+            
+            game.events.emit(GameEvents.BALL_PADDLE_COLLISION);
+            return; // Skip other collisions for this frame
         }
 
-        // Game over if ball hits bottom
-        if (this.y + this.radius >= canvas.height) {
-            return true;
+        // Get potential collision candidates from spatial grid
+        const candidates = game.spatialGrid.getCollisionCandidates(this);
+        console.log('Collision candidates:', candidates.length);
+
+        // Check collisions with candidates
+        for (const candidate of candidates) {
+            if (candidate instanceof Brick) {
+                console.log('Checking brick collision:', {
+                    ball: { x: this.x, y: this.y, radius: this.radius },
+                    brick: { x: candidate.x, y: candidate.y, width: candidate.width, height: candidate.height }
+                });
+
+                if (this.checkCollision(candidate)) {
+                    console.log('Brick collision detected!');
+                    // Brick collision
+                    const closestX = Math.max(candidate.x, Math.min(this.x, candidate.x + candidate.width));
+                    const closestY = Math.max(candidate.y, Math.min(this.y, candidate.y + candidate.height));
+                    const distanceX = this.x - closestX;
+                    const distanceY = this.y - closestY;
+                    const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+                    if (distance < this.radius) {
+                        console.log('Brick collision response');
+                        const overlapX = this.radius - Math.abs(distanceX);
+                        const overlapY = this.radius - Math.abs(distanceY);
+
+                        if (overlapX < overlapY) {
+                            this.dx = -this.dx;
+                        } else {
+                            this.dy = -this.dy;
+                        }
+
+                        if (candidate.hit()) {
+                            const index = game.bricks.indexOf(candidate);
+                            if (index !== -1) {
+                                game.bricks.splice(index, 1);
+                                game.events.emit(GameEvents.BRICK_DESTROYED, { type: candidate.type });
+
+                                if (Math.random() < GameConfig.boosterConfig.dropChance) {
+                                    const booster = new Booster(
+                                        candidate.x + candidate.width / 2,
+                                        candidate.y + candidate.height / 2,
+                                        Math.random() < 0.5 ? 'splitter' : 'fire',
+                                        game.spriteManager
+                                    );
+                                    game.boosters.push(booster);
+                                }
+                            }
+                        }
+                        return; // Skip other collisions for this frame
+                    }
+                }
+            }
         }
 
-        return false;
+        // Bottom collision (game over)
+        if (this.y + this.radius >= game.canvas.height) {
+            game.events.emit(GameEvents.GAME_OVER);
+        }
+    }
+
+    checkCollision(entity) {
+        const collision = this.x + this.radius > entity.x &&
+               this.x - this.radius < entity.x + (entity.width || entity.radius * 2) &&
+               this.y + this.radius > entity.y &&
+               this.y - this.radius < entity.y + (entity.height || entity.radius * 2);
+        
+        console.log('Collision check:', {
+            ball: { x: this.x, y: this.y, radius: this.radius },
+            entity: { 
+                x: entity.x, 
+                y: entity.y, 
+                width: entity.width || entity.radius * 2, 
+                height: entity.height || entity.radius * 2 
+            },
+            result: collision
+        });
+        
+        return collision;
     }
 
     setFireMode(enabled) {
@@ -65,51 +163,6 @@ export class Ball extends AbstractEntity {
 
     isFireMode() {
         return this.fireMode;
-    }
-
-    collidesWith(brick) {
-        // Find closest point on brick to ball
-        const closestX = Math.max(brick.x, Math.min(this.x, brick.x + brick.width));
-        const closestY = Math.max(brick.y, Math.min(this.y, brick.y + brick.height));
-
-        // Calculate distance between closest point and ball center
-        const distanceX = this.x - closestX;
-        const distanceY = this.y - closestY;
-        const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-
-        return distance <= this.radius;
-    }
-
-    bounceOffBrick(brick) {
-        // Find closest point on brick to ball
-        const closestX = Math.max(brick.x, Math.min(this.x, brick.x + brick.width));
-        const closestY = Math.max(brick.y, Math.min(this.y, brick.y + brick.height));
-
-        // Calculate distance between closest point and ball center
-        const distanceX = this.x - closestX;
-        const distanceY = this.y - closestY;
-        const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-
-        if (distance <= this.radius) {
-            // Determine which side was hit with a small tolerance
-            const tolerance = 2;
-            const hitLeft = Math.abs(closestX - brick.x) < tolerance;
-            const hitRight = Math.abs(closestX - (brick.x + brick.width)) < tolerance;
-            const hitTop = Math.abs(closestY - brick.y) < tolerance;
-            const hitBottom = Math.abs(closestY - (brick.y + brick.height)) < tolerance;
-
-            // Bounce based on which side was hit
-            if (hitLeft || hitRight) {
-                this.dx = -this.dx;
-                // Adjust position to prevent sticking
-                this.x = hitLeft ? brick.x - this.radius : brick.x + brick.width + this.radius;
-            }
-            if (hitTop || hitBottom) {
-                this.dy = -this.dy;
-                // Adjust position to prevent sticking
-                this.y = hitTop ? brick.y - this.radius : brick.y + brick.height + this.radius;
-            }
-        }
     }
 
     draw(ctx) {

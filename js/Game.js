@@ -4,6 +4,11 @@ import { Brick } from './entities/Brick.js';
 import { Ball } from './entities/Ball.js';
 import { Paddle } from './entities/Paddle.js';
 import { SpriteManager } from './core/SpriteManager.js';
+import { StateManager } from './core/StateManager.js';
+import { PlayingState } from './states/PlayingState.js';
+import { GameOverState } from './states/GameOverState.js';
+import { EventSystem, GameEvents } from './core/EventSystem.js';
+import { SpatialGrid } from './core/SpatialGrid.js';
 
 export class Game {
     constructor(canvas) {
@@ -21,6 +26,22 @@ export class Game {
         this.spriteManager = new SpriteManager();
         this.gameOver = false;
         this.gameCompleted = false;
+        this.levelCompleted = false;
+        
+        // Initialize spatial grid for collision detection
+        this.spatialGrid = new SpatialGrid(
+            GameConfig.collisionConfig.cellSize,
+            canvas.width,
+            canvas.height
+        );
+        
+        // Combo system
+        this.currentCombo = 0;
+        this.bricksDestroyedThisShot = 0;
+        this.lastBrickDestroyed = false;
+        
+        // Initialize event system
+        this.events = new EventSystem();
         
         // Initialize paddle with proper dimensions
         const paddleWidth = GameConfig.paddleConfig.width;
@@ -29,11 +50,114 @@ export class Game {
         const paddleY = canvas.height - paddleHeight - 20;
         this.paddle = new Paddle(paddleX, paddleY, paddleWidth, paddleHeight, this.spriteManager);
         
-        this.setupLevel();
+        // Initialize state manager
+        this.stateManager = new StateManager(this);
+        this.stateManager.addState('playing', new PlayingState(this));
+        this.stateManager.addState('gameOver', new GameOverState(this));
+        
+        // Set up event listeners
+        this.setupEventListeners();
+        
+        // Start with playing state
+        this.stateManager.changeState('playing');
+    }
+
+    setupEventListeners() {
+        // Remove any existing listeners first
+        this.events.off(GameEvents.BRICK_DESTROYED);
+        this.events.off(GameEvents.BALL_PADDLE_COLLISION);
+        this.events.off(GameEvents.GAME_OVER);
+        this.events.off(GameEvents.GAME_COMPLETED);
+        this.events.off(GameEvents.LEVEL_COMPLETED);
+        this.events.off(GameEvents.BOOSTER_ACTIVATED);
+
+        // Score updates with combo system
+        this.events.on(GameEvents.BRICK_DESTROYED, () => {
+            this.bricksDestroyedThisShot++;
+            this.lastBrickDestroyed = true;
+
+            // Calculate score with combo multiplier
+            const baseScore = 100;
+            const comboMultiplier = Math.min(5, 1 + (this.bricksDestroyedThisShot - 1) * 0.5);
+            const scoreGain = Math.floor(baseScore * comboMultiplier);
+            
+            this.score += scoreGain;
+
+            // Update score display
+            const scoreValue = document.getElementById('scoreValue');
+            if (scoreValue) {
+                scoreValue.textContent = this.score;
+            }
+
+            // Log combo message if multiple bricks destroyed
+            if (this.bricksDestroyedThisShot > 1) {
+                const message = `Combo x${this.bricksDestroyedThisShot}! +${scoreGain} points`;
+                const color = '#ffcc00';
+                const logMessages = document.getElementById('logMessages');
+                if (logMessages) {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'log-message';
+                    messageElement.textContent = message;
+                    messageElement.style.color = color;
+                    logMessages.insertBefore(messageElement, logMessages.firstChild);
+                    
+                    // Limit log messages to 10
+                    while (logMessages.children.length > 10) {
+                        logMessages.removeChild(logMessages.lastChild);
+                    }
+                }
+            }
+        });
+
+        // Reset combo when ball hits paddle
+        this.events.on(GameEvents.BALL_PADDLE_COLLISION, () => {
+            this.bricksDestroyedThisShot = 0;
+            this.lastBrickDestroyed = false;
+        });
+
+        // Game state changes
+        this.events.on(GameEvents.GAME_OVER, () => {
+            this.gameOver = true;
+            this.stateManager.changeState('gameOver');
+        });
+
+        this.events.on(GameEvents.GAME_COMPLETED, () => {
+            this.gameCompleted = true;
+            this.stateManager.changeState('gameOver');
+        });
+
+        // Level progression
+        this.events.on(GameEvents.LEVEL_COMPLETED, () => {
+            this.level++;
+            const levelValue = document.getElementById('levelValue');
+            if (levelValue) {
+                levelValue.textContent = this.level;
+            }
+            
+            const logMessages = document.getElementById('logMessages');
+            if (logMessages) {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'log-message';
+                messageElement.textContent = `Level ${this.level - 1} completed!`;
+                messageElement.style.color = '#ffcc00';
+                logMessages.insertBefore(messageElement, logMessages.firstChild);
+                
+                // Limit log messages to 10
+                while (logMessages.children.length > 10) {
+                    logMessages.removeChild(logMessages.lastChild);
+                }
+            }
+        });
+
+        // Booster handling
+        this.events.on(GameEvents.BOOSTER_ACTIVATED, ({ type }) => {
+            this.activateBooster(type);
+        });
     }
 
     setupLevel() {
         this.bricks = [];
+        this.levelCompleted = false;  // Reset the level completed flag
         const levelConfig = GameConfig.levels[this.level - 1];
         const brickWidth = GameConfig.brickConfig.width;
         const brickHeight = GameConfig.brickConfig.height;
@@ -54,154 +178,65 @@ export class Game {
             }
         }
 
-        // Reset balls with proper radius
+        // Reset balls with proper radius and position
         const ballRadius = GameConfig.ballConfig.radius;
-        const ballX = this.canvas.width / 2;
+        const ballX = this.paddle.x + this.paddle.width / 2;
         const ballY = this.paddle.y - ballRadius - 10;
         this.balls = [new Ball(ballX, ballY, ballRadius, this.spriteManager)];
+        
+        this.events.emit(GameEvents.LEVEL_START, { level: this.level });
     }
 
-    update() {
-        if (this.gameOver || this.gameCompleted) {
+    update(deltaTime) {
+        if (this.gameOver) {
+            this.stateManager.changeState('gameOver');
             return;
         }
-
-        // Update paddle
-        this.paddle.update(this.canvas);
-
-        // Update balls and check for game over
-        this.balls = this.balls.filter(ball => {
-            const isGameOver = ball.update(this.canvas, this.paddle);
-            if (isGameOver) {
-                return false;
-            }
-            
-            // Check brick collisions
-            this.bricks.forEach(brick => {
-                if (brick.active && ball.collidesWith(brick)) {
-                    ball.bounceOffBrick(brick);
-                    if (brick.takeDamage()) {
-                        this.score += 100;
-                        if (brick.shouldDropBooster()) {
-                            const boosterType = brick.getBoosterType();
-                            const booster = new Booster(
-                                brick.x + brick.width/2,
-                                brick.y + brick.height,
-                                boosterType,
-                                this.spriteManager
-                            );
-                            this.boosters.push(booster);
-                        }
-                    }
-                }
-            });
-            
-            return true;
-        });
-
-        // Game over if no balls left
+        
         if (this.balls.length === 0) {
             this.gameOver = true;
+            this.stateManager.changeState('gameOver');
             return;
         }
-
-        // Update boosters
-        this.boosters = this.boosters.filter(booster => {
-            booster.update();
-            if (booster.isOffScreen(this.canvas)) {
-                return false;
-            }
-            if (booster.collidesWith(this.paddle)) {
-                this.activateBooster(booster.type);
-                return false;
-            }
-            return true;
-        });
-
-        // Check level completion
-        if (this.bricks.every(brick => !brick.active)) {
-            this.level++;
-            if (this.level <= GameConfig.levels.length) {
+        
+        // Update spatial grid
+        this.spatialGrid.clear();
+        this.bricks.forEach(brick => this.spatialGrid.add(brick));
+        this.balls.forEach(ball => this.spatialGrid.add(ball));
+        this.spatialGrid.add(this.paddle);
+        
+        // Check level completion only when all bricks are destroyed and we're not at the last level
+        if (this.bricks.length === 0 && !this.gameOver && !this.levelCompleted) {
+            if (this.level < GameConfig.levels.length) {
+                this.levelCompleted = true;
+                this.events.emit(GameEvents.LEVEL_COMPLETED);
                 this.setupLevel();
             } else {
                 this.gameCompleted = true;
+                this.events.emit(GameEvents.GAME_COMPLETED);
             }
         }
+        
+        this.stateManager.update(deltaTime);
     }
 
     draw() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw bricks
-        this.bricks.forEach(brick => brick.draw(this.ctx));
-        
-        // Draw balls
-        this.balls.forEach(ball => ball.draw(this.ctx));
-        
-        // Draw paddle
-        this.paddle.draw(this.ctx);
-        
-        // Draw boosters
-        this.boosters.forEach(booster => booster.draw(this.ctx));
-
-        // Draw game over or game completed message
         if (this.gameOver) {
-            this.drawMessage('GAME OVER');
-        } else if (this.gameCompleted) {
-            this.drawMessage('GAME COMPLETED!');
+            this.stateManager.draw();
+            return;
         }
+        
+        if (this.balls.length === 0) {
+            this.gameOver = true;
+            this.stateManager.draw();
+            return;
+        }
+        
+        this.stateManager.draw();
     }
 
-    drawMessage(message) {
-        // Draw semi-transparent overlay
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw message
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = '48px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(message, this.canvas.width / 2, this.canvas.height / 2);
-        
-        // Draw score
-        this.ctx.font = '24px Arial';
-        this.ctx.fillText(`Final Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 40);
-
-        // Draw restart button
-        const buttonWidth = 200;
-        const buttonHeight = 50;
-        const buttonX = (this.canvas.width - buttonWidth) / 2;
-        const buttonY = this.canvas.height / 2 + 80;
-
-        // Button background
-        this.ctx.fillStyle = '#4CAF50';
-        this.ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
-        
-        // Button text
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = '24px Arial';
-        this.ctx.fillText('RESTART', this.canvas.width / 2, buttonY + 35);
-
-        // Store button coordinates for click detection
-        this.restartButton = {
-            x: buttonX,
-            y: buttonY,
-            width: buttonWidth,
-            height: buttonHeight
-        };
-    }
-
-    handleClick(x, y) {
-        if (this.gameOver || this.gameCompleted) {
-            // Check if click is within restart button bounds
-            if (this.restartButton && 
-                x >= this.restartButton.x && 
-                x <= this.restartButton.x + this.restartButton.width &&
-                y >= this.restartButton.y && 
-                y <= this.restartButton.y + this.restartButton.height) {
-                this.reset();
-            }
-        }
+    handleInput(key) {
+        this.stateManager.handleInput(key);
     }
 
     activateBooster(type) {
@@ -210,7 +245,6 @@ export class Game {
         }
 
         this.activeBoosters[type] = true;
-        const effect = GameConfig.boosterConfig.effects[type];
         
         if (type === 'splitter') {
             // Split all balls
@@ -236,8 +270,9 @@ export class Game {
                     this.balls.forEach(ball => {
                         ball.setFireMode(false);
                     });
+                    this.events.emit(GameEvents.BOOSTER_DEACTIVATED, { type });
                 }
-            }, effect.duration);
+            }, GameConfig.boosterConfig.effects.fire.duration);
         }
     }
 
@@ -246,11 +281,15 @@ export class Game {
         this.level = 1;
         this.gameOver = false;
         this.gameCompleted = false;
+        this.levelCompleted = false;
         this.boosters = [];
         this.activeBoosters = {
             splitter: false,
             fire: false
         };
+        this.bricksDestroyedThisShot = 0;
+        this.lastBrickDestroyed = false;
         this.setupLevel();
+        this.events.emit(GameEvents.GAME_START);
     }
 } 
