@@ -109,7 +109,7 @@ export class Game {
             }
         });
 
-        // Reset combo when ball hits paddle
+        // Reset combo when ball hits paddle - no logging needed
         this.events.on(GameEvents.BALL_PADDLE_COLLISION, () => {
             this.bricksDestroyedThisShot = 0;
             this.lastBrickDestroyed = false;

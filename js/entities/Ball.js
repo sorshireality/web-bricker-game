@@ -72,61 +72,51 @@ export class Ball extends AbstractEntity {
             
             this.y = game.paddle.y - this.radius - 1;
             
-            game.events.emit(GameEvents.BALL_PADDLE_COLLISION);
+            // Only emit collision event if the ball was moving downward
+            if (this.dy > 0) {
+                game.events.emit(GameEvents.BALL_PADDLE_COLLISION);
+            }
             return; // Skip other collisions for this frame
         }
 
         // Get potential collision candidates from spatial grid
         const candidates = game.spatialGrid.getCollisionCandidates(this);
-        console.log('Collision candidates:', candidates.length);
 
-        // Check collisions with candidates
+        // Check collisions with bricks
         for (const candidate of candidates) {
             if (candidate instanceof Brick) {
-                console.log('Checking brick collision:', {
-                    ball: { x: this.x, y: this.y, radius: this.radius },
-                    brick: { x: candidate.x, y: candidate.y, width: candidate.width, height: candidate.height }
-                });
+                const distanceX = Math.abs(this.x - (candidate.x + candidate.width / 2));
+                const distanceY = Math.abs(this.y - (candidate.y + candidate.height / 2));
+                const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
 
-                if (this.checkCollision(candidate)) {
-                    console.log('Brick collision detected!');
-                    // Brick collision
-                    const closestX = Math.max(candidate.x, Math.min(this.x, candidate.x + candidate.width));
-                    const closestY = Math.max(candidate.y, Math.min(this.y, candidate.y + candidate.height));
-                    const distanceX = this.x - closestX;
-                    const distanceY = this.y - closestY;
-                    const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+                if (distance < this.radius) {
+                    const overlapX = this.radius - Math.abs(distanceX);
+                    const overlapY = this.radius - Math.abs(distanceY);
 
-                    if (distance < this.radius) {
-                        console.log('Brick collision response');
-                        const overlapX = this.radius - Math.abs(distanceX);
-                        const overlapY = this.radius - Math.abs(distanceY);
+                    if (overlapX < overlapY) {
+                        this.dx = -this.dx;
+                    } else {
+                        this.dy = -this.dy;
+                    }
 
-                        if (overlapX < overlapY) {
-                            this.dx = -this.dx;
-                        } else {
-                            this.dy = -this.dy;
-                        }
+                    if (candidate.hit()) {
+                        const index = game.bricks.indexOf(candidate);
+                        if (index !== -1) {
+                            game.bricks.splice(index, 1);
+                            game.events.emit(GameEvents.BRICK_DESTROYED, { type: candidate.type });
 
-                        if (candidate.hit()) {
-                            const index = game.bricks.indexOf(candidate);
-                            if (index !== -1) {
-                                game.bricks.splice(index, 1);
-                                game.events.emit(GameEvents.BRICK_DESTROYED, { type: candidate.type });
-
-                                if (Math.random() < GameConfig.boosterConfig.dropChance) {
-                                    const booster = new Booster(
-                                        candidate.x + candidate.width / 2,
-                                        candidate.y + candidate.height / 2,
-                                        Math.random() < 0.5 ? 'splitter' : 'fire',
-                                        game.spriteManager
-                                    );
-                                    game.boosters.push(booster);
-                                }
+                            if (Math.random() < GameConfig.boosterConfig.dropChance) {
+                                const booster = new Booster(
+                                    candidate.x + candidate.width / 2,
+                                    candidate.y + candidate.height / 2,
+                                    Math.random() < 0.5 ? 'splitter' : 'fire',
+                                    game.spriteManager
+                                );
+                                game.boosters.push(booster);
                             }
                         }
-                        return; // Skip other collisions for this frame
                     }
+                    return; // Skip other collisions for this frame
                 }
             }
         }

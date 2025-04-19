@@ -51,12 +51,10 @@ export class PlayingState extends GameState {
         if (this.game.bricks.length === 0 && !this.game.levelCompleted && !this.game.gameOver) {
             this.game.levelCompleted = true;
             
-            // Emit level completed event
-            this.game.events.emit(GameEvents.LEVEL_COMPLETE);
-            
             // Check if there are more levels
             if (this.game.level < GameConfig.levels.length) {
                 this.game.level++;
+                this.game.events.emit(GameEvents.LEVEL_COMPLETE, { level: this.game.level - 1 });
                 this.game.setupLevel();
                 this.waitingForLaunch = true;
             } else {
